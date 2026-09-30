@@ -25,7 +25,12 @@ const searchQuery = pageQuerySchema
     /** Rupees in the query string for convenience; converted to paise. */
     maxPriceRupees: z.coerce.number().positive().max(100_000_000).optional(),
     minDiscount: z.coerce.number().int().min(1).max(99).optional(),
-    endingWithinHours: z.coerce.number().int().min(1).max(24 * 90).optional(),
+    endingWithinHours: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 90)
+      .optional(),
     sort: z.enum(['relevance', 'recommended', 'nearest', 'newest', 'ending_soon', 'discount']).optional(),
   })
   .refine(bothOrNeither, pointMessage);

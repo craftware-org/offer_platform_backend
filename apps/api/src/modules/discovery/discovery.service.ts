@@ -67,7 +67,8 @@ export class DiscoveryService {
   async search(query: DiscoveryQuery): Promise<Page<DiscoveredOffer>> {
     const now = new Date();
     const parsed = query.q ? parseSearch(query.q) : { text: '', nearMe: false };
-    const point = query.lat !== undefined && query.lng !== undefined ? { lat: query.lat, lng: query.lng } : null;
+    const point =
+      query.lat !== undefined && query.lng !== undefined ? { lat: query.lat, lng: query.lng } : null;
     const radiusKm = point ? (query.radiusKm ?? DEFAULT_RADIUS_KM) : null;
 
     // ---- Resolve names to ids -----------------------------------------------------------------
@@ -87,7 +88,8 @@ export class DiscoveryService {
     const maxPrice = query.maxPrice ?? ('maxPrice' in parsed ? parsed.maxPrice : undefined);
     const minDiscount = query.minDiscount ?? ('minDiscount' in parsed ? parsed.minDiscount : undefined);
     const sort: DiscoverySort = query.sort ?? (text ? 'relevance' : point ? 'recommended' : 'newest');
-    if (sort === 'nearest' && !point) throw AppError.validation({ sort: 'Sorting by distance needs lat and lng' });
+    if (sort === 'nearest' && !point)
+      throw AppError.validation({ sort: 'Sorting by distance needs lat and lng' });
 
     // ---- Filters: only live offers of verified businesses, then what the customer asked for ----
     const filters: SQL[] = [
@@ -97,7 +99,9 @@ export class DiscoveryService {
       eq(businesses.status, 'VERIFIED'),
       eq(businessLocations.isPrimary, true),
     ];
-    const pointSql = point ? sql`ST_SetSRID(ST_MakePoint(${point.lng}::float8, ${point.lat}::float8), 4326)::geography` : null;
+    const pointSql = point
+      ? sql`ST_SetSRID(ST_MakePoint(${point.lng}::float8, ${point.lat}::float8), 4326)::geography`
+      : null;
     if (pointSql && radiusKm) {
       filters.push(sql`ST_DWithin(${businessLocations.location}, ${pointSql}, ${radiusKm * 1000}::float8)`);
     }

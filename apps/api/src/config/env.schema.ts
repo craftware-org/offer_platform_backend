@@ -46,6 +46,23 @@ export const envSchema = z
     /** Only `console` exists until an SMS vendor is chosen (ADR-0006). */
     SMS_PROVIDER: z.enum(['console']).default('console'),
 
+    /** Email login codes: `smtp` (e.g. Gmail with an App Password) or `console` (log only). */
+    EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(465),
+    /** true = implicit TLS (port 465); false = STARTTLS (port 587). */
+    SMTP_SECURE: z.stringbool().default(true),
+    SMTP_USER: z.string().min(1).optional(),
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    /** Sender shown to users, e.g. "Dodoom <craftwaretech@gmail.com>". */
+    EMAIL_FROM: z.string().min(3).optional(),
+
+    /**
+     * Team-only preview deployment (ADR-0013): allows console SMS/email and local storage on a
+     * `staging` server. Never allowed in production.
+     */
+    PREVIEW_MODE: z.stringbool().default(false),
+
     RATE_LIMIT_PER_IP_PER_MINUTE: z.coerce.number().int().min(1).default(300),
 
     /** Only `local` (disk) exists until the S3 adapter is built with the AWS setup (Phase 9). */
@@ -69,20 +86,32 @@ export const envSchema = z
   })
   .superRefine((env, ctx) => {
     const deployed = env.NODE_ENV === 'staging' || env.NODE_ENV === 'production';
-    if (deployed && env.SMS_PROVIDER === 'console') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['SMS_PROVIDER'],
-        message: 'The console SMS provider prints OTPs to logs and is not allowed in staging/production',
-      });
+    const issue = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message });
+
+    if (env.PREVIEW_MODE && env.NODE_ENV === 'production') {
+      issue('PREVIEW_MODE', 'Preview mode is never allowed in production');
     }
-    if (deployed && env.STORAGE_PROVIDER === 'local') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['STORAGE_PROVIDER'],
-        message:
-          'Local disk storage is lost when containers restart and is not allowed in staging/production',
-      });
+    // Deployed servers must use real providers, unless this is an explicit team-only preview.
+    const strict = deployed && !env.PREVIEW_MODE;
+    if (strict && env.SMS_PROVIDER === 'console') {
+      issue(
+        'SMS_PROVIDER',
+        'The console SMS provider prints OTPs to logs; only allowed in development or PREVIEW_MODE',
+      );
+    }
+    if (strict && env.EMAIL_PROVIDER === 'console') {
+      issue(
+        'EMAIL_PROVIDER',
+        'The console email provider prints OTPs to logs; only allowed in development or PREVIEW_MODE',
+      );
+    }
+    if (strict && env.STORAGE_PROVIDER === 'local') {
+      issue('STORAGE_PROVIDER', 'Local disk storage is only allowed in development or PREVIEW_MODE');
+    }
+    if (env.EMAIL_PROVIDER === 'smtp') {
+      for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'EMAIL_FROM'] as const) {
+        if (!env[key]) issue(key, `${key} is required when EMAIL_PROVIDER=smtp`);
+      }
     }
     if (deployed && env.JWT_ACCESS_SECRET === env.OTP_HASH_SECRET) {
       ctx.addIssue({

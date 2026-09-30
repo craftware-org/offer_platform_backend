@@ -16,7 +16,8 @@ export interface ParsedSearch {
   place?: string;
 }
 
-const PRICE = /\b(?:under|below|within|less than|upto|up to)\s*(?:rs\.?|inr|₹)?\s*(\d[\d,]*)\s*(?:rs|rupees|\/-)?/i;
+const PRICE =
+  /\b(?:under|below|within|less than|upto|up to)\s*(?:rs\.?|inr|₹)?\s*(\d[\d,]*)\s*(?:rs|rupees|\/-)?/i;
 const PERCENT = /(\d{1,2})\s*(?:%|percent)(?:\s*(?:off|discount))?/i;
 const NEAR_ME = /\b(?:near\s*me|nearby|near by|around me|close to me)\b/i;
 const PLACE = /\bin\s+([a-z][a-z .'-]{1,60})$/i;

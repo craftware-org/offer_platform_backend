@@ -61,7 +61,12 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
       ...DHARWAD,
     });
 
-    const offer = async (key: string, owner: LoggedIn, businessId: string, input: Record<string, unknown>) => {
+    const offer = async (
+      key: string,
+      owner: LoggedIn,
+      businessId: string,
+      input: Record<string, unknown>,
+    ) => {
       ids[key] = (await approvedOffer(ctx, owner, admin, businessId, input)).id;
     };
     await offer('shirts', a, shopA.id, {
@@ -83,7 +88,12 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
     await offer('biryani', b, shopB.id, {
       title: 'Family Biryani Combo',
       categoryId: refs.categoryId('restaurants'),
-      pricing: { type: 'COMBO', offerPrice: 59900, originalPrice: 79900, comboItems: ['Biryani x2', 'Raita', 'Dessert'] },
+      pricing: {
+        type: 'COMBO',
+        offerPrice: 59900,
+        originalPrice: 79900,
+        comboItems: ['Biryani x2', 'Raita', 'Dessert'],
+      },
       expiresAt: hoursFromNow(10), // ending soon
     });
     await offer('tv', c, shopC.id, {
@@ -149,7 +159,10 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
 
   it('"fashion in Vidya Nagar" resolves the locality and keeps only offers there', async () => {
     const res = await discover({ q: 'fashion in Vidya Nagar' }).expect(200);
-    expect(res.body.meta.interpretation).toMatchObject({ text: 'fashion', locality: { slug: 'vidya-nagar' } });
+    expect(res.body.meta.interpretation).toMatchObject({
+      text: 'fashion',
+      locality: { slug: 'vidya-nagar' },
+    });
     // All three offers of "Vidyanagar Fashions" match "fashion" (the shop's name); the biryani
     // house elsewhere in Hubballi and the Dharwad shop do not qualify.
     expect(titles(res).sort()).toEqual(
@@ -182,7 +195,11 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
     expect((await discover({ q: 'shirt' }).expect(200)).body.data).toEqual([]);
     await ctx.db
       .update(offers)
-      .set({ status: 'ACTIVE', expiresAt: new Date(Date.now() - 1000), startsAt: new Date(Date.now() - 7_200_000) })
+      .set({
+        status: 'ACTIVE',
+        expiresAt: new Date(Date.now() - 1000),
+        startsAt: new Date(Date.now() - 7_200_000),
+      })
       .where(eq(offers.id, shirts));
     expect((await discover({ q: 'shirt' }).expect(200)).body.data).toEqual([]); // ended, even before the worker runs
   });

@@ -15,7 +15,10 @@ export interface Refs {
 
 /** Looks up seeded cities and categories by slug. */
 export async function loadRefs(ctx: TestContext): Promise<Refs> {
-  const cities = (await ctx.http().get('/api/v1/cities').expect(200)).body.data as { id: string; slug: string }[];
+  const cities = (await ctx.http().get('/api/v1/cities').expect(200)).body.data as {
+    id: string;
+    slug: string;
+  }[];
   const tree = (await ctx.http().get('/api/v1/categories').expect(200)).body.data as {
     id: string;
     slug: string;
@@ -35,7 +38,14 @@ export async function verifiedBusiness(
   ctx: TestContext,
   owner: LoggedIn,
   verifier: LoggedIn,
-  input: { name: string; categoryId: string; cityId: string; latitude: number; longitude: number; localityId?: string },
+  input: {
+    name: string;
+    categoryId: string;
+    cityId: string;
+    latitude: number;
+    longitude: number;
+    localityId?: string;
+  },
 ): Promise<{ id: string; slug: string }> {
   const biz = await ctx
     .http()

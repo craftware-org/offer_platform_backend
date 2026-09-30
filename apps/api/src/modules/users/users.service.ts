@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
 import { escapeLike } from '../../common/text/like.js';
@@ -15,6 +15,8 @@ export interface UserView {
   phone: string | null;
   name: string | null;
   email: string | null;
+  /** True once the user logged in with a code sent to this email. */
+  emailVerified: boolean;
   status: UserRow['status'];
   roles: string[];
   createdAt: Date;
@@ -61,21 +63,77 @@ export class UsersService {
       .onConflictDoNothing({ target: users.phone })
       .returning();
     if (inserted) {
-      await this.accessControl.grantRole(inserted.id, Role.CUSTOMER, null, tx);
-      await this.audit.record(
-        {
-          actorUserId: inserted.id,
-          action: AuditAction.USER_REGISTERED,
-          entityType: 'user',
-          entityId: inserted.id,
-        },
-        tx,
-      );
+      await this.registered(inserted.id, 'phone', tx);
       return { user: inserted, created: true };
     }
     const existing = await this.findByPhone(phone, tx);
     if (!existing) throw new Error('User vanished between insert and select');
     return { user: existing, created: false };
+  }
+
+  /**
+   * Returns the account for an email whose owner just proved control of it (entered the emailed
+   * code), creating a CUSTOMER account on first login.
+   *
+   * Security: an email that someone merely TYPED into their profile (unverified) never logs anyone
+   * into that account; otherwise an attacker could pre-register a victim's email and wait for the
+   * victim to "log in" to the attacker's account (pre-account hijacking). If such an unproven claim
+   * exists, it is removed, and the person who proved control of the inbox gets their own account.
+   */
+  async findOrCreateByVerifiedEmail(
+    email: string,
+    tx: Executor,
+  ): Promise<{ user: UserRow; created: boolean }> {
+    const [verified] = await tx
+      .select()
+      .from(users)
+      .where(and(eq(users.email, email), isNotNull(users.emailVerifiedAt)));
+    if (verified) return { user: verified, created: false };
+
+    const released = await tx
+      .update(users)
+      .set({ email: null })
+      .where(and(eq(users.email, email), isNull(users.emailVerifiedAt)))
+      .returning({ id: users.id });
+    for (const { id } of released) {
+      await this.audit.record(
+        {
+          actorUserId: null,
+          action: AuditAction.UNVERIFIED_EMAIL_RELEASED,
+          entityType: 'user',
+          entityId: id,
+        },
+        tx,
+      );
+    }
+
+    const [inserted] = await tx
+      .insert(users)
+      .values({ email, emailVerifiedAt: new Date() })
+      .onConflictDoNothing({ target: users.email })
+      .returning();
+    if (!inserted) {
+      // Created concurrently by a parallel login with the same code-verified email.
+      const [again] = await tx.select().from(users).where(eq(users.email, email));
+      if (!again) throw new Error('User vanished between insert and select');
+      return { user: again, created: false };
+    }
+    await this.registered(inserted.id, 'email', tx);
+    return { user: inserted, created: true };
+  }
+
+  private async registered(userId: string, via: 'phone' | 'email', tx: Executor): Promise<void> {
+    await this.accessControl.grantRole(userId, Role.CUSTOMER, null, tx);
+    await this.audit.record(
+      {
+        actorUserId: userId,
+        action: AuditAction.USER_REGISTERED,
+        entityType: 'user',
+        entityId: userId,
+        newValue: { via },
+      },
+      tx,
+    );
   }
 
   async markLogin(userId: string, tx: Executor): Promise<void> {
@@ -89,12 +147,15 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, update: ProfileUpdate): Promise<UserView> {
+    const [current] = await this.db.select({ email: users.email }).from(users).where(eq(users.id, userId));
+    const emailChanged = update.email !== undefined && update.email !== current?.email;
     try {
       await this.db
         .update(users)
         .set({
           ...(update.name !== undefined ? { name: update.name } : {}),
-          ...(update.email !== undefined ? { email: update.email } : {}),
+          // A changed email is unproven until the user logs in with a code sent to it.
+          ...(emailChanged ? { email: update.email, emailVerifiedAt: null } : {}),
         })
         .where(and(eq(users.id, userId), ne(users.status, 'DELETED')));
     } catch (error) {
@@ -113,7 +174,14 @@ export class UsersService {
   async anonymize(userId: string, tx: Executor): Promise<void> {
     const updated = await tx
       .update(users)
-      .set({ phone: null, name: null, email: null, status: 'DELETED', deletedAt: new Date() })
+      .set({
+        phone: null,
+        name: null,
+        email: null,
+        emailVerifiedAt: null,
+        status: 'DELETED',
+        deletedAt: new Date(),
+      })
       .where(and(eq(users.id, userId), ne(users.status, 'DELETED')))
       .returning({ id: users.id });
     if (updated.length === 0) throw AppError.notFound('User');
@@ -243,6 +311,7 @@ export class UsersService {
       phone: row.phone,
       name: row.name,
       email: row.email,
+      emailVerified: row.email !== null && row.emailVerifiedAt !== null,
       status: row.status,
       roles,
       createdAt: row.createdAt,
