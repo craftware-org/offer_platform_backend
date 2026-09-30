@@ -2,6 +2,7 @@ import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { and, count, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
+import { escapeLike } from '../../common/text/like.js';
 import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { isUniqueViolation } from '../../infrastructure/database/pg-errors.js';
 import { Role, type Role as RoleCode } from '../access-control/access-control.catalog.js';
@@ -34,8 +35,6 @@ interface Actor {
   userId: string;
   requestId?: string;
 }
-
-const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 @Injectable()
 export class UsersService {

@@ -2,11 +2,12 @@ import type { NestApplicationOptions } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { API_PREFIX } from './common/http/api-prefix.js';
 import { bodyParserErrorMiddleware } from './common/http/body-parser-error.middleware.js';
 import { requestIdMiddleware } from './common/http/request-id.middleware.js';
 import { APP_CONFIG, type AppConfig } from './config/config.module.js';
 
-export const API_PREFIX = 'api/v1';
+export { API_PREFIX };
 const JSON_BODY_LIMIT = '100kb';
 
 /** Nest's default body parser is disabled so the request-id middleware can run before it. */

@@ -340,7 +340,7 @@ Migrations run as a separate release step, never automatically on app boot in pr
 |---|---|---|
 | 0 | This document + ADRs | ✅ Approved 2026-09-30 |
 | 1 | Foundation: project, config, Docker (local services), DB + PostGIS, migrations, logging, errors, auth (OTP), roles/permissions, audit, CI | ✅ Done 2026-09-30: 22 unit + 38 integration tests green against real PostGIS + Valkey |
-| 2 | Businesses: registration, profile, locations, documents, verification, admin management, business dashboard API | Business → Admin → Verified works end to end |
+| 2 | Businesses: registration, profile, location (PostGIS), photo-based verification ([ADR-0012](docs/adr/0012-business-verification-without-identity-documents.md)), admin management, dashboard API; categories, cities/localities and platform settings (moved up from Phase 4) | ✅ Done 2026-09-30: Business → Admin → Verified tested end to end (75 unit + 68 integration tests) |
 | 3 | Offers: create/edit, validation, pricing, price history, moderation, scheduling, expiry | Full lifecycle tested |
 | 4 | Discovery: categories, search, filters, nearby, feeds, detail pages, SEO data (slugs, OG fields, sitemap feed) | Customer finds a nearby offer |
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | |

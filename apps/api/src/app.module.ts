@@ -9,10 +9,15 @@ import { APP_CONFIG, ConfigModule, type AppConfig } from './config/config.module
 import { DatabaseModule } from './infrastructure/database/database.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
 import { SmsModule } from './infrastructure/sms/sms.module.js';
+import { StorageModule } from './infrastructure/storage/storage.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { BusinessesModule } from './modules/businesses/businesses.module.js';
+import { CategoriesModule } from './modules/categories/categories.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { LocationsModule } from './modules/locations/locations.module.js';
+import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 
 @Module({
@@ -37,11 +42,16 @@ import { UsersModule } from './modules/users/users.module.js';
     DatabaseModule,
     RedisModule,
     SmsModule,
+    StorageModule,
     HealthModule,
     AccessControlModule,
     AuditModule,
     UsersModule,
     AuthModule,
+    PlatformSettingsModule,
+    LocationsModule,
+    CategoriesModule,
+    BusinessesModule,
   ],
   providers: [
     { provide: APP_PIPE, useFactory: createValidationPipe },

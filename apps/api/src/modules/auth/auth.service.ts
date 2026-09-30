@@ -6,7 +6,7 @@ import { AccessControlService } from '../access-control/access-control.service.j
 import { AuditAction, AuditService } from '../audit/audit.service.js';
 import { UsersService, type UserView } from '../users/users.service.js';
 import { OtpService } from './otp.service.js';
-import { normalizePhone } from './phone.js';
+import { normalizePhone } from '../../common/phone/phone.js';
 import { invalidRefreshToken, TokenService, type TokenPair } from './token.service.js';
 
 export const accountSuspended = () =>

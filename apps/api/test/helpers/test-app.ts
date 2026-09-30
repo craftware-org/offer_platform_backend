@@ -1,4 +1,7 @@
 import { randomInt } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Redis } from 'ioredis';
@@ -41,6 +44,7 @@ export interface TestContext {
 
 /** Boots the real application (same modules, guards, pipes, filters) against the test containers. */
 export async function createTestApp(env: Record<string, string> = {}): Promise<TestContext> {
+  const storageDir = await mkdtemp(join(tmpdir(), 'offer-platform-storage-'));
   Object.assign(process.env, {
     NODE_ENV: 'test',
     DATABASE_URL: inject('databaseUrl'),
@@ -49,6 +53,8 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
     OTP_HASH_SECRET: 'test-otp-secret-that-is-long-enough-111111',
     OTP_MAX_REQUESTS_PER_IP_PER_HOUR: '1000',
     RATE_LIMIT_PER_IP_PER_MINUTE: '10000',
+    UPLOADS_PER_USER_PER_HOUR: '1000',
+    STORAGE_LOCAL_DIR: storageDir,
     ...env,
   });
 
@@ -70,7 +76,10 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
     db,
     redis: app.get<Redis>(REDIS),
     sms,
-    close: () => app.close(),
+    close: async () => {
+      await app.close();
+      await rm(storageDir, { recursive: true, force: true });
+    },
   };
 }
 

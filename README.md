@@ -10,7 +10,8 @@ A local offers and business discovery platform, built, hosted and operated by **
 |---|---|---|
 | 0 | Architecture and decisions | ✅ Done: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/adr](docs/adr/README.md) |
 | 1 | Foundation: config, database, logging, errors, phone-OTP auth, roles/permissions, audit, CI | ✅ Done |
-| 2 | Businesses and verification | Next |
+| 2 | Businesses and verification, categories, cities/localities, image uploads | ✅ Done: [docs/business-workflow.md](docs/business-workflow.md) |
+| 3 | Offers: creation, pricing, moderation, scheduling, expiry | Next |
 
 ## Repository layout
 
@@ -86,6 +87,7 @@ Commit the migration together with the code change. Never edit a migration that 
 - [ARCHITECTURE.md](ARCHITECTURE.md): overall design
 - [docs/adr](docs/adr/README.md): why each technology was chosen
 - [docs/api.md](docs/api.md): API conventions and endpoints
+- [docs/business-workflow.md](docs/business-workflow.md): registration, verification, images
 - [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md)
 
 ## Contributing
