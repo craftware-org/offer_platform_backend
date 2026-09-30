@@ -23,6 +23,8 @@ export const Permission = {
   CATEGORIES_MANAGE: 'categories:manage',
   LOCATIONS_MANAGE: 'locations:manage',
   SETTINGS_MANAGE: 'settings:manage',
+  OFFERS_READ: 'offers:read',
+  OFFERS_MODERATE: 'offers:moderate',
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
@@ -37,6 +39,8 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'categories:manage': 'Create, edit, disable and reorder categories',
   'locations:manage': 'Manage cities and localities',
   'settings:manage': 'Change platform settings (e.g. verification requirements)',
+  'offers:read': 'View all offers, including drafts and those under review',
+  'offers:moderate': 'Approve, reject, request changes to, suspend and reactivate offers',
 };
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -48,6 +52,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.BUSINESSES_MANAGE,
   Permission.CATEGORIES_MANAGE,
   Permission.LOCATIONS_MANAGE,
+  Permission.OFFERS_READ,
+  Permission.OFFERS_MODERATE,
 ];
 
 export const ROLE_DEFINITIONS: Record<

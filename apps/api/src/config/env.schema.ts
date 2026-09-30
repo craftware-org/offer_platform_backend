@@ -54,6 +54,9 @@ export const envSchema = z
     STORAGE_LOCAL_DIR: z.string().min(1).default('.storage'),
     UPLOADS_PER_USER_PER_HOUR: z.coerce.number().int().min(1).default(60),
 
+    /** How often the worker activates scheduled offers and expires ended ones. */
+    OFFER_LIFECYCLE_INTERVAL_MS: z.coerce.number().int().min(1000).max(3_600_000).default(60_000),
+
     // Future features: must stay false in the MVP.
     MONETIZATION_ENABLED: z.stringbool().default(false),
     BUSINESS_SUBSCRIPTIONS_ENABLED: z.stringbool().default(false),

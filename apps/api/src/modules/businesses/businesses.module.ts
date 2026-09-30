@@ -28,6 +28,6 @@ import { BusinessesService } from './businesses.service.js';
     BusinessImagesService,
     ImageProcessor,
   ],
-  exports: [BusinessesService],
+  exports: [BusinessesService, BusinessReader],
 })
 export class BusinessesModule {}

@@ -17,6 +17,9 @@ Redis serves three roles: BullMQ job queue, cache, and rate-limit counters. Jobs
 ## Implementation note (2026-09-30, Phase 1)
 Local development and tests use **Valkey 8** (the open-source, protocol-compatible Redis fork that AWS ElastiCache offers), so development matches production. The client is `ioredis`. BullMQ 6 supports it and will be added with the first background job (offer expiry, Phase 3). Phase 1 uses Redis only for rate limiting.
 
+## Implementation note (2026-09-30, Phase 3)
+BullMQ 6 is now used. The `worker` process (`src/worker.ts`, `WorkerModule`) registers an idempotent job scheduler (`upsertJobScheduler`, every `OFFER_LIFECYCLE_INTERVAL_MS`) for offer activation and expiry. BullMQ 6 defines its own connection option types, and connections are built from `REDIS_URL` with `maxRetriesPerRequest: null`. The API process does not use BullMQ yet.
+
 ## Consequences
 - Redis is required in every environment (a Docker container locally, a managed service in production).
 - Jobs must be idempotent (conditional `UPDATE … WHERE status = … AND expires_at <= now()`).

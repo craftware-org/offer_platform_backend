@@ -41,6 +41,18 @@ Extensions (migration `0000_extensions`): `postgis`, `pg_trgm`, `citext`, `unacc
 
 Seed data (migration `0003_seed_reference_data`, runs once): Hubballi and Dharwad (Karnataka), and the initial category tree from the product spec.
 
+## Tables (Phase 3)
+
+| Table | Owner module | Purpose |
+|---|---|---|
+| `offers` | offers | One row per offer: `type` (7 types), pricing columns in **paise** (`bigint`), `discount_percent` (`numeric(4,1)`), dates, `status`, review fields. `CHECK` constraints enforce non-negative money, offer price < original price, a 0–100 discount and `starts_at < expires_at` |
+| `offer_images` | offers | Photo metadata (files in object storage) |
+| `offer_price_history` | offers | Append-only pricing changes with a full snapshot, source and who changed it |
+
+Indexes support the queries that matter: `(status, expires_at)` and `(status, starts_at)` for the lifecycle job and live listings, plus business and category. Offers are never hard-deleted, except drafts that were never submitted.
+
+**Documented cross-module read:** `OffersPublicService` and `OfferImagesService` read `businesses.status` and `business_locations` (read-only) to decide visibility and filter by city/locality. This is the same exception ADR-0002 allows for discovery queries.
+
 ### Known drizzle-kit quirk: PostGIS column types
 
 drizzle-kit writes custom column types in quotes (`"geography(Point, 4326)"`), which PostgreSQL rejects. After generating a migration that adds a `geographyPoint` column, **remove those quotes by hand** (see `0002_…sql`, which carries a note). Snapshots are unaffected, and `db:generate` afterwards reports no drift.

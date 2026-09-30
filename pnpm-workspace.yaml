@@ -9,3 +9,4 @@ allowBuilds:
   cpu-features: false      # optional native speed-up for ssh2 (testcontainers), falls back to JS
   ssh2: false              # optional native crypto build, falls back to JS
   protobufjs: false        # postinstall only prints version notices
+  msgpackr-extract: false  # optional native speed-up for BullMQ's msgpackr, falls back to JS

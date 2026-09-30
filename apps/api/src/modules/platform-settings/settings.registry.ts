@@ -15,6 +15,15 @@ export const SETTINGS = {
     }),
     defaultValue: { requireRegistrationNumber: false, requireShopPhoto: true, requireOwnerPhoto: false },
   },
+  /** Limits applied to every offer. */
+  'offers.limits': {
+    description: 'Maximum offer duration (days) and photos per offer',
+    schema: z.strictObject({
+      maxDurationDays: z.int().min(1).max(365),
+      maxImages: z.int().min(0).max(20),
+    }),
+    defaultValue: { maxDurationDays: 90, maxImages: 5 },
+  },
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS;
