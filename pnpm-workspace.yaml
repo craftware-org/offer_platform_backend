@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm blocks dependency install scripts by default. Allow only what is required.
+allowBuilds:
+  esbuild: true            # verifies its native binary; used by drizzle-kit
+  '@scarf/scarf': false    # download telemetry, not needed
+  cpu-features: false      # optional native speed-up for ssh2 (testcontainers), falls back to JS
+  ssh2: false              # optional native crypto build, falls back to JS
+  protobufjs: false        # postinstall only prints version notices

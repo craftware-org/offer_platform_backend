@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  api:
+    name: API — lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6 # version comes from "packageManager" in package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint, type-check, unit tests, build
+        run: pnpm turbo run lint typecheck test build
+
+      - name: Integration tests (real PostGIS + Valkey via Testcontainers)
+        run: pnpm --filter @offer-platform/api test:integration
+
+      - name: Export OpenAPI contract
+        working-directory: apps/api
+        # Placeholder values only: the export builds the app without connecting to anything.
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: ci-placeholder-not-a-secret-000000000000
+          OTP_HASH_SECRET: ci-placeholder-not-a-secret-111111111111
+        run: node dist/cli/export-openapi.js
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: openapi
+          path: apps/api/openapi.json
