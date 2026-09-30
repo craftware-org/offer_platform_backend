@@ -1,0 +1,23 @@
+# dependencies / build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.turbo/
+# generated API contract (published as a CI artifact)
+openapi.json
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# logs / OS / editor
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

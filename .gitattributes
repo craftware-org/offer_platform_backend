@@ -1,0 +1,6 @@
+# Store and check out text files with LF on every OS (Windows, macOS, Linux CI, Docker).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
