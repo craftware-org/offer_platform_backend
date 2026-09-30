@@ -217,6 +217,8 @@ Full column-level design goes in `docs/database.md` in Phase 1. Key conventions:
 
 **Future tables (schema reserved, not built):** `redemptions`, `reviews`, `rewards`, `referrals`, `campaigns`, `sponsored_listings`, `plans`, `subscriptions`, `payments`.
 
+**Monetization (future, product owner decision 2026-09-30):** the MVP is free. When monetization is enabled (feature flags, all `false` today), **every platform fee is set by admins in the database** (`plans`: name, price in paise, billing period, features; editable and audited). No price is ever hard-coded. Offer prices entered by businesses are unrelated to platform fees.
+
 **Change from the original proposal:** `categories` + `subcategories` become **one self-referencing `categories` table** (`parent_id`). It supports the same admin features (create, edit, disable, reorder, sub-levels) with one set of APIs, and a third level can be added later without a migration.
 
 ---
@@ -341,7 +343,7 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 0 | This document + ADRs | ✅ Approved 2026-09-30 |
 | 1 | Foundation: project, config, Docker (local services), DB + PostGIS, migrations, logging, errors, auth (OTP), roles/permissions, audit, CI | ✅ Done 2026-09-30: 22 unit + 38 integration tests green against real PostGIS + Valkey |
 | 2 | Businesses: registration, profile, location (PostGIS), photo-based verification ([ADR-0012](docs/adr/0012-business-verification-without-identity-documents.md)), admin management, dashboard API; categories, cities/localities and platform settings (moved up from Phase 4) | ✅ Done 2026-09-30: Business → Admin → Verified tested end to end (75 unit + 68 integration tests) |
-| 3 | Offers: create/edit, validation, pricing, price history, moderation, scheduling, expiry | Full lifecycle tested |
+| 3 | Offers: 7 types, create/edit, validation, server-side pricing, price history, moderation (every offer), scheduling, expiry worker (BullMQ) | ✅ Done 2026-09-30: full lifecycle tested, including the real worker (145 unit + 100 integration tests) |
 | 4 | Discovery: categories, search, filters, nearby, feeds, detail pages, SEO data (slugs, OG fields, sitemap feed) | Customer finds a nearby offer |
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | |
 | 6 | Notifications: infrastructure, preferences, dispatch | |

@@ -36,6 +36,7 @@ Clients should branch on `error.code`. Codes are stable and never renamed:
 | `CONFLICT` | 409 | Violates a uniqueness or state rule |
 | `INVALID_STATUS_TRANSITION` | 409 | Action not allowed from the current status (e.g. verify a PENDING business) |
 | `FIELDS_LOCKED` | 409 | Field can only be changed by an admin now; see `fields` |
+| `BUSINESS_NOT_VERIFIED` | 403 / 409 | The business must be verified for this (e.g. submitting or approving an offer) |
 | `PAYLOAD_TOO_LARGE` | 413 | JSON body over 100 KB or upload over 8 MB |
 | `RATE_LIMITED` | 429 | Too many requests; wait `Retry-After` seconds |
 | `OTP_INVALID` | 400 | Wrong, expired or already-used code |
@@ -100,3 +101,23 @@ See [business-workflow.md](business-workflow.md) for the full flow. `:id` values
 | GET / POST / PATCH / PUT | `/admin/categories`, `/admin/categories/:id`, `/admin/categories/order` | `categories:manage` | Manage and reorder categories |
 | GET / POST / PATCH | `/admin/cities…`, `/admin/localities/:id` | `locations:manage` | Manage cities and localities |
 | GET / PUT | `/admin/settings`, `/admin/settings/:key` | `settings:manage` | Platform settings (e.g. verification requirements) |
+
+## Endpoints (Phase 3): offers
+
+See [offer-workflow.md](offer-workflow.md) for types, pricing and lifecycle, and [moderation.md](moderation.md) for the admin side. Times are ISO-8601 **with an offset** (`2026-10-01T09:00:00+05:30`).
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/offers` | public | Live offers; `?city=&locality=&category=&business=` (slugs), paginated |
+| GET | `/offers/:slug` | public | Offer page (ACTIVE / PAUSED / EXPIRED, with `availability`) |
+| GET | `/media/offer-images/:imageId/:variant` | public | Photo of a publicly visible offer |
+| POST | `/me/businesses/:businessId/offers` | owner/staff | Create a DRAFT |
+| GET | `/me/businesses/:businessId/offers` | owner/staff | The business's offers, `?status=` |
+| GET | `/me/businesses/:businessId/offers/summary` | owner/staff | Count per status (dashboard) |
+| GET / PATCH / DELETE | `/me/offers/:id` | owner/staff | View / edit (approved offers go back to review) / delete a never-submitted draft |
+| POST | `/me/offers/:id/submit`, `/withdraw`, `/pause`, `/resume`, `/end` | owner/staff | Lifecycle actions (`allowedActions` in the response says which are available) |
+| GET | `/me/offers/:id/price-history` | owner/staff | Pricing changes |
+| POST / DELETE / GET | `/me/offers/:id/images[/:imageId[/:variant]]` | owner/staff | Offer photos (max from `offers.limits`, default 5) |
+| GET | `/admin/offers` | `offers:read` | List/search; `?status=PENDING_REVIEW` is the review queue |
+| GET | `/admin/offers/:id`, `/admin/offers/:id/price-history`, `/admin/offers/:id/images/:imageId/:variant` | `offers:read` | Review details |
+| PATCH | `/admin/offers/:id/status` | `offers:moderate` | `APPROVE`, `REJECT`, `REQUEST_CHANGES`, `SUSPEND`, `REACTIVATE` |

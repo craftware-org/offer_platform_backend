@@ -11,7 +11,8 @@ A local offers and business discovery platform, built, hosted and operated by **
 | 0 | Architecture and decisions | ✅ Done: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/adr](docs/adr/README.md) |
 | 1 | Foundation: config, database, logging, errors, phone-OTP auth, roles/permissions, audit, CI | ✅ Done |
 | 2 | Businesses and verification, categories, cities/localities, image uploads | ✅ Done: [docs/business-workflow.md](docs/business-workflow.md) |
-| 3 | Offers: creation, pricing, moderation, scheduling, expiry | Next |
+| 3 | Offers: 7 types, server-side pricing, price history, admin review, scheduling/expiry worker | ✅ Done: [docs/offer-workflow.md](docs/offer-workflow.md) |
+| 4 | Customer discovery: search, filters, nearby, ranking | Next |
 
 ## Repository layout
 
@@ -52,6 +53,12 @@ pnpm --filter @offer-platform/api db:seed
 pnpm --filter @offer-platform/api start:dev
 ```
 
+In a second terminal, start the background worker (it activates scheduled offers and expires ended ones):
+
+```bash
+pnpm --filter @offer-platform/api start:worker:dev
+```
+
 - API: http://localhost:3000/api/v1/health
 - Interactive API docs (not served in production): http://localhost:3000/api/docs
 - During development, OTP codes are printed to the API log (`[DEV SMS]`). No SMS is sent.
@@ -88,6 +95,7 @@ Commit the migration together with the code change. Never edit a migration that 
 - [docs/adr](docs/adr/README.md): why each technology was chosen
 - [docs/api.md](docs/api.md): API conventions and endpoints
 - [docs/business-workflow.md](docs/business-workflow.md): registration, verification, images
+- [docs/offer-workflow.md](docs/offer-workflow.md): offer types, pricing, lifecycle, worker · [docs/moderation.md](docs/moderation.md): admin review guide
 - [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md)
 
 ## Contributing

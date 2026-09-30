@@ -12,12 +12,12 @@ All checks happen in the backend. Anything a frontend hides is only cosmetic.
 |---|---|
 | CUSTOMER | none (acts only on own data) |
 | BUSINESS_OWNER / BUSINESS_STAFF | none globally; access to a business comes from membership in `business_staff` |
-| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage` |
+| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage`, `offers:read`, `offers:moderate` |
 | SUPER_ADMIN | all ADMIN permissions + `roles:assign`, `settings:manage` |
 
 ### Business-scoped access
 
-A user can manage a business only if they are listed for it in `business_staff` (the registering user is `OWNER`). Anyone else gets **404**, not 403, so business ids can't be probed. An admin who owns a business cannot verify it.
+A user can manage a business, and its offers, only if they are listed for it in `business_staff` (the registering user is `OWNER`). Anyone else gets **404**, not 403, so business and offer ids can't be probed. An admin who owns or manages a business can neither verify it nor approve its offers.
 
 ## Request pipeline
 
