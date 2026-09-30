@@ -17,6 +17,7 @@ import { BusinessesModule } from './modules/businesses/businesses.module.js';
 import { CategoriesModule } from './modules/categories/categories.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { LocationsModule } from './modules/locations/locations.module.js';
+import { DiscoveryModule } from './modules/discovery/discovery.module.js';
 import { OffersModule } from './modules/offers/offers.module.js';
 import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module.js';
 import { UsersModule } from './modules/users/users.module.js';
@@ -42,6 +43,7 @@ import { UsersModule } from './modules/users/users.module.js';
     CategoriesModule,
     BusinessesModule,
     OffersModule,
+    DiscoveryModule,
   ],
   providers: [
     { provide: APP_PIPE, useFactory: createValidationPipe },
