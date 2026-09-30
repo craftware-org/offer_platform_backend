@@ -28,6 +28,13 @@ describe('parseEnv', () => {
     expect(env.CORS_ORIGINS).toEqual(['http://localhost:5173', 'https://offer-platform.example']);
   });
 
+  it('treats empty values as not set (blank lines in .env files)', () => {
+    const env = parseEnv({ ...base, SMTP_PASSWORD: '', PORT: '' });
+    expect(env.SMTP_PASSWORD).toBeUndefined();
+    expect(env.PORT).toBe(3000);
+    expect(() => parseEnv({ ...base, DATABASE_URL: '' })).toThrow(/DATABASE_URL/);
+  });
+
   it('rejects missing required values', () => {
     expect(() => parseEnv({})).toThrow(/DATABASE_URL/);
   });

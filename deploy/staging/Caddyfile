@@ -1,0 +1,28 @@
+# Caddy obtains and renews a free HTTPS certificate for {$API_DOMAIN} automatically
+# (e.g. 13-233-10-20.sslip.io now; api.<real-domain> later — only .env changes).
+{
+	# Customer coordinates are personal data: never write them to Caddy's logs either.
+	log default {
+		format filter {
+			fields {
+				request>uri query {
+					delete lat
+					delete lng
+					delete latitude
+					delete longitude
+				}
+			}
+		}
+	}
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	# Security headers (incl. HSTS) come from the API itself (helmet).
+
+	reverse_proxy api:3000 {
+		# While the API restarts during a deploy, hold requests briefly instead of failing them.
+		lb_try_duration 15s
+	}
+}

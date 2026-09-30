@@ -1,0 +1,16 @@
+# Keep build contexts small and free of secrets.
+**/node_modules
+**/dist
+**/.turbo
+**/.storage
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+.git
+.github
+docs
+deploy
+**/openapi.json

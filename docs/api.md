@@ -121,3 +121,26 @@ See [offer-workflow.md](offer-workflow.md) for types, pricing and lifecycle, and
 | GET | `/admin/offers` | `offers:read` | List/search; `?status=PENDING_REVIEW` is the review queue |
 | GET | `/admin/offers/:id`, `/admin/offers/:id/price-history`, `/admin/offers/:id/images/:imageId/:variant` | `offers:read` | Review details |
 | PATCH | `/admin/offers/:id/status` | `offers:moderate` | `APPROVE`, `REJECT`, `REQUEST_CHANGES`, `SUSPEND`, `REACTIVATE` |
+
+## Endpoints (Phase 4): discovery, email login, meta
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/discover/offers` | public | Search and filter live offers (see below) |
+| GET | `/discover/home` | public | Home sections: `nearby`, `recommended`, `newOffers`, `endingSoon` (`?lat&lng&radiusKm&city`) |
+| POST | `/auth/otp/request` | public | Now `{ "phone": … }` **or** `{ "email": … }` (exactly one) |
+| POST | `/auth/otp/verify` | public | `{ phone \| email, code }` |
+| GET | `/meta` | public | App name, preview flag, login methods, radius options, feature flags |
+
+### `GET /discover/offers`
+
+| Parameter | Meaning |
+|---|---|
+| `q` | Free text. Understands `under 2000` (max price), `50%` / `50% off` (min discount), `near me`, `in <locality>`; English word forms ("shirt" ↔ "Shirts"), typos, and any script (Kannada) |
+| `lat`, `lng` | Customer position, used **only for this request** (never stored; masked in all logs) |
+| `radiusKm` | Default 5, max 25 (with `lat`/`lng`) |
+| `city`, `locality`, `category`, `business` | Slugs (a parent category includes its subcategories) |
+| `maxPriceRupees`, `minDiscount`, `endingWithinHours` | Explicit filters (they override what `q` implies) |
+| `sort` | `relevance` (default with `q`), `recommended` (default with a location), `newest`, `nearest`, `ending_soon`, `discount` |
+
+Each item is a public offer plus `distanceKm`. `meta.interpretation` shows how the query was understood (`text`, `maxPrice`, `minDiscount`, `locality`, `radiusKm`, `sort`, `needsLocation`). Ranking is rule-based and defined in one file (`modules/discovery/ranking.ts`).
