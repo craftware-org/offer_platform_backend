@@ -15,5 +15,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0009](0009-neutral-codename.md) | Neutral codename; brand name is configuration | Accepted |
 | [0010](0010-single-repo-monorepo.md) | Single repository (monorepo) with pnpm + Turborepo | Accepted |
 | [0011](0011-aws-hosting.md) | AWS hosting, Mumbai region | Accepted |
+| [0012](0012-business-verification-without-identity-documents.md) | Business verification without identity documents | Accepted |
 
 Template: [`template.md`](template.md)

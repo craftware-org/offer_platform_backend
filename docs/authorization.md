@@ -8,12 +8,16 @@ All checks happen in the backend. Anything a frontend hides is only cosmetic.
 - **Permissions** are what endpoints check (e.g. `users:read`), never role names.
 - The single source of truth is `apps/api/src/modules/access-control/access-control.catalog.ts`. `pnpm db:seed` syncs it into the `roles`, `permissions` and `role_permissions` tables, and is safe to run on every deploy.
 
-| Role | Permissions (Phase 1) |
+| Role | Permissions |
 |---|---|
 | CUSTOMER | none (acts only on own data) |
-| BUSINESS_OWNER / BUSINESS_STAFF | none globally; access is scoped per business (Phase 2) |
-| ADMIN | `users:read`, `users:manage-status`, `audit:read` |
-| SUPER_ADMIN | all ADMIN permissions + `roles:assign` |
+| BUSINESS_OWNER / BUSINESS_STAFF | none globally; access to a business comes from membership in `business_staff` |
+| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage` |
+| SUPER_ADMIN | all ADMIN permissions + `roles:assign`, `settings:manage` |
+
+### Business-scoped access
+
+A user can manage a business only if they are listed for it in `business_staff` (the registering user is `OWNER`). Anyone else gets **404**, not 403, so business ids can't be probed. An admin who owns a business cannot verify it.
 
 ## Request pipeline
 
@@ -28,7 +32,7 @@ Secure by default: a new endpoint without `@Public()` requires login.
 ## Rules
 
 - Every registered user has `CUSTOMER`.
-- Only `ADMIN` and `SUPER_ADMIN` can be granted through the admin API. Business roles will come from business registration flows.
+- Only `ADMIN` and `SUPER_ADMIN` can be granted through the admin API. `BUSINESS_OWNER` is granted automatically when a user registers a business.
 - An admin cannot change their own account status. A super admin cannot remove their own `SUPER_ADMIN` role, which prevents accidental lock-out.
 - Suspended users cannot have roles changed (reactivate first).
 - Every status change and role change is written to `audit_logs` with actor, old/new values, reason and request id.

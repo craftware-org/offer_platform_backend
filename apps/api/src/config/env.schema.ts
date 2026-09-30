@@ -48,6 +48,12 @@ export const envSchema = z
 
     RATE_LIMIT_PER_IP_PER_MINUTE: z.coerce.number().int().min(1).default(300),
 
+    /** Only `local` (disk) exists until the S3 adapter is built with the AWS setup (Phase 9). */
+    STORAGE_PROVIDER: z.enum(['local']).default('local'),
+    /** Folder for `local` storage, relative to the API's working directory. */
+    STORAGE_LOCAL_DIR: z.string().min(1).default('.storage'),
+    UPLOADS_PER_USER_PER_HOUR: z.coerce.number().int().min(1).default(60),
+
     // Future features: must stay false in the MVP.
     MONETIZATION_ENABLED: z.stringbool().default(false),
     BUSINESS_SUBSCRIPTIONS_ENABLED: z.stringbool().default(false),
@@ -65,6 +71,14 @@ export const envSchema = z
         code: 'custom',
         path: ['SMS_PROVIDER'],
         message: 'The console SMS provider prints OTPs to logs and is not allowed in staging/production',
+      });
+    }
+    if (deployed && env.STORAGE_PROVIDER === 'local') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STORAGE_PROVIDER'],
+        message:
+          'Local disk storage is lost when containers restart and is not allowed in staging/production',
       });
     }
     if (deployed && env.JWT_ACCESS_SECRET === env.OTP_HASH_SECRET) {

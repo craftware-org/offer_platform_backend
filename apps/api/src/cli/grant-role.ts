@@ -9,7 +9,7 @@ import { createDatabase } from '../infrastructure/database/database.module.js';
 import { Role } from '../modules/access-control/access-control.catalog.js';
 import { AccessControlService } from '../modules/access-control/access-control.service.js';
 import { AuditAction, AuditService } from '../modules/audit/audit.service.js';
-import { normalizePhone } from '../modules/auth/phone.js';
+import { normalizePhone } from '../common/phone/phone.js';
 import { users } from '../modules/users/users.schema.js';
 
 const { values } = parseArgs({ options: { phone: { type: 'string' }, role: { type: 'string' } } });

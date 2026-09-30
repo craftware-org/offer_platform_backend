@@ -26,6 +26,25 @@ Extensions (migration `0000_extensions`): `postgis`, `pg_trgm`, `citext`, `unacc
 | `refresh_tokens` | auth | Session tokens (SHA-256 only), rotation chain (`family_id`, `replaced_by_id`) |
 | `audit_logs` | audit | Append-only record of administrative and security events |
 
+## Tables (Phase 2)
+
+| Table | Owner module | Purpose |
+|---|---|---|
+| `platform_settings` | platform-settings | Admin-editable settings (JSON), validated by `settings.registry.ts` |
+| `cities` | locations | Operating cities with a centre point (`geography`) and service radius |
+| `localities` | locations | Admin-managed neighbourhoods per city |
+| `categories` | categories | Two-level tree (`parent_id`), `sort_order`, `is_active` |
+| `businesses` | businesses | Profile, contact, `status` (PENDING → UNDER_REVIEW → VERIFIED/REJECTED, SUSPENDED), `slug` |
+| `business_locations` | businesses | Address and **`geography(Point, 4326)`** map pin with a GiST index (for "near me"); opening hours. One primary per business |
+| `business_staff` | businesses | Who may manage a business (`OWNER`/`STAFF`) |
+| `business_images` | businesses | Image metadata; files live in object storage under `storage_prefix` |
+
+Seed data (migration `0003_seed_reference_data`, runs once): Hubballi and Dharwad (Karnataka), and the initial category tree from the product spec.
+
+### Known drizzle-kit quirk: PostGIS column types
+
+drizzle-kit writes custom column types in quotes (`"geography(Point, 4326)"`), which PostgreSQL rejects. After generating a migration that adds a `geographyPoint` column, **remove those quotes by hand** (see `0002_…sql`, which carries a note). Snapshots are unaffected, and `db:generate` afterwards reports no drift.
+
 ## Local development
 
 `docker compose up -d` starts PostgreSQL on `127.0.0.1:5432`. The PostGIS image also installs `postgis_tiger_geocoder` and `postgis_topology` in the local database. These are **not** used by the application and are not created by our migrations, so production will not have them.

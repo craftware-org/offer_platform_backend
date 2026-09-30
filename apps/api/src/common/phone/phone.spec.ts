@@ -1,4 +1,4 @@
-import { AppError } from '../../common/errors/app-error.js';
+import { AppError } from '../errors/app-error.js';
 import { normalizePhone } from './phone.js';
 
 describe('normalizePhone', () => {
