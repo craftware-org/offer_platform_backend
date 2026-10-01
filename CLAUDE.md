@@ -2,7 +2,33 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-01.** Whoever finishes a piece of work updates the "Status" and "What's next" sections in the same pull request.
+> **Last updated: 2026-10-01.**
+
+> [!IMPORTANT]
+> **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
+
+---
+
+## 0. How to keep this file current (required for every change)
+
+In **every** pull request, before asking for merge:
+
+1. **Add an entry to §14 Change log**, at the top, using the format given there:
+   - date, PR number and author (person or agent);
+   - **what** changed, **why**, and **how it was verified** (tests, browser run, deploy check);
+   - anything the next person must know: new env vars, migrations, manual steps, follow-ups.
+2. **Update §2 Status** when a phase or feature changes state. Keep the test counts in sync with the latest run.
+3. **Update §3 What is running where** if you change servers, URLs, accounts, environment variables, DNS or deploy targets. Write *where* each secret lives, never the secret itself.
+4. **Update §10 What's next and §13 Roadmap:**
+   - remove what you finished;
+   - add what you discovered;
+   - mark phases "Approved (date)" or "✅ Done (date)".
+5. **Update the cheat sheet (§7), commands (§5, §6) and gotchas (§11)** if behaviour, commands or pitfalls changed.
+6. **Bump "Last updated"** at the top.
+
+Other rules:
+- Deeper docs (`docs/*.md`, ADRs) are updated too; this file links to them and does not replace them.
+- When an AI agent finishes a task, its last step is this update. If something was left unfinished, say so in the change log under **Follow-ups**.
 
 ---
 
@@ -44,7 +70,7 @@ This is the single entry point for **teammates and AI assistants** (Claude Code 
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log
 
 ---
 
@@ -276,7 +302,7 @@ Images:
 **Product work (each needs approval first):**
 - Phase 5: engagement (saved offers, follow a business, share and contact-click tracking, report an offer).
 - Admin screens still missing on the website (the API already exists): categories, cities/areas, platform settings, users (suspend, roles), audit log.
-- Phases 6–9 as in §2.
+- Admin screens, then Phases 5–9: see the detailed plan in **§13 Roadmap**.
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -337,3 +363,287 @@ Images:
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
+
+---
+
+## 13. Roadmap (proposed: each phase needs approval before work starts)
+
+> **Status of this section:** a **proposal** written on 2026-10-01. Nothing below is approved or built unless it is marked ✅.
+> - **Before starting a phase:** explain the plan to the product owner, get approval, then mark it "Approved (date)" here. Big decisions get an ADR.
+> - **Order:** A first (small, and it removes command-line-only admin work), then 5 → 9. Phase 9 infrastructure tasks can run in parallel once the owner's decisions are made.
+> - **"Done when" for every phase also includes:**
+>   - integration tests against a real database;
+>   - a browser run of the new screens;
+>   - docs and this file updated;
+>   - CI green;
+>   - deployed to the preview.
+
+### A. Admin screens on the website (small, recommended next)
+
+**Why:** several admin jobs exist in the API but today need server commands or raw API calls.
+
+**Dependencies:** none. The API endpoints and permissions already exist.
+
+**Website** (`/admin/...`, each screen shown according to the admin's permissions):
+
+| Screen | What it does | Permission |
+|---|---|---|
+| Categories | Show the tree; add, rename, deactivate; reorder | `categories:manage` |
+| Cities and areas | Add or rename cities and localities; deactivate. Replaces `add-localities` for daily use | `locations:manage` |
+| Platform settings | Business verification requirements (`business.verification`); offer limits: max days, max photos (`offers.limits`) | `settings:manage` |
+| Users | Search, view, suspend or reactivate with a reason; grant or revoke ADMIN / SUPER_ADMIN | `users:read`, `users:manage-status`, `roles:assign` |
+| Audit log | Filter by user, entity, action and date; read-only | `audit:read` |
+
+**Server:** only small additions where a screen needs data the API doesn't return yet. Check [docs/api.md](docs/api.md) first.
+
+**Done when:**
+- Every admin task in §6 except server operations can be done in the browser.
+- `grant-role` and `add-localities` are needed only for bootstrapping.
+
+### Phase 5. Engagement
+
+**Goal:** customers keep and share offers, follow shops and report bad offers; businesses learn which offers interest people.
+
+**Dependencies:** none (A recommended first, so admins have screens to work the report queue).
+
+| Feature | Customer side | Business / admin side |
+|---|---|---|
+| Save offers | Heart button on offer cards and pages; a "Saved" page; ended offers marked as ended | Saves per offer (feeds Phase 7) |
+| Follow a business | "Follow" button on the business page; a "Following" list | Follower count |
+| Share | Share button (WhatsApp / copy link); the share is recorded | Share count |
+| Contact taps | Taps on Call / WhatsApp / Directions are recorded | Counts per offer and business |
+| Report an offer | "Report" with a reason (wrong price, expired, misleading, offensive, other) and an optional note | Admin **report queue**: dismiss, or suspend the offer (uses the existing moderation) |
+
+**Server (proposed):**
+- New tables:
+  - `saved_offers` (user + offer, unique);
+  - `business_follows`;
+  - `offer_reports` (reason, note, status, handled by);
+  - `engagement_events` (type, offer/business, time, optional user, **never coordinates**).
+- Endpoints:
+  - `/me/saved-offers`;
+  - `/me/follows`;
+  - `POST /offers/:slug/events` (rate-limited, no login needed);
+  - `POST /offers/:slug/reports` (login required, one open report per user per offer);
+  - `/admin/reports`.
+- New permission `reports:moderate`. Report decisions are audited.
+
+**Done when:**
+- A logged-in customer can save, follow, share and report.
+- Taps are counted.
+- Admins can handle reports end to end.
+
+### Phase 6. Notifications
+
+**Goal:** people hear about what matters to them without opening the site.
+
+**Dependencies:**
+- **Owner decision: push provider** (FCM proposed).
+- Email already works (Gmail SMTP in preview). Production needs a sender on the real domain, see Phase 9.
+
+**Channels:**
+- email (exists);
+- **in-app inbox** (new);
+- **push**: web push now if approved, mobile push later with the apps.
+
+**Events (proposed first set):**
+
+| To | When |
+|---|---|
+| Business | Business verified / rejected (with reason); offer approved / rejected / changes requested; offer about to end; offer reported and suspended |
+| Customer | A followed business publishes a new offer; a saved offer ends within 24 hours |
+| Admins | Daily summary: businesses and offers waiting for review, open reports |
+
+**Server:**
+- `notifications` table (the inbox) and `notification_preferences` (per user, per event type and channel).
+- A BullMQ queue `notifications` with retries and failure logging.
+- Templates in code, with the brand name taken from configuration.
+- Email: an unsubscribe link in every message; never sent to unverified emails.
+- Push: quiet hours.
+
+**Website:** bell icon with an unread count, an inbox page, and notification settings on the Account page.
+
+**Done when:**
+- Each event reaches the right person on the chosen channels.
+- Preferences are respected.
+- Failures are retried and logged.
+
+### Phase 7. Analytics
+
+**Goal:** businesses see how their offers perform; admins see the platform's health.
+
+**Dependencies:** Phase 5 (the events).
+
+**Server:**
+- Offer page views are recorded like the Phase 5 events.
+- A nightly worker job fills `daily_offer_stats` and `daily_business_stats`: views, saves, shares, contact taps, follows.
+- Raw events are kept for a limited time (to be decided); daily totals are kept long-term.
+- **No personal data** in analytics tables.
+
+**Business dashboard:**
+- Per offer and in total, for the last 7 / 30 days: views, saves, shares, calls, WhatsApp taps, directions.
+- The best-performing offer.
+- Simple charts; the charting library is chosen with an ADR.
+
+**Admin dashboard:**
+- New businesses and offers.
+- Review queue: size and age.
+- Active offers by city and category.
+- Reports.
+- Sign-ups and logins.
+
+**Done when:** both dashboards match the raw events in a test with known data.
+
+### Phase 8. Security audit
+
+**Goal:** find and fix weaknesses before real users arrive.
+
+**Checklist (proposed):**
+- **Standard review:** go through OWASP ASVS level 2 for login, sessions, access control, input checks, uploads, errors and logs.
+- **Access control:** every endpoint's permission check gets a test proving a lower role is refused.
+- **Rate limits:** checked against brute force and spam (codes, passwords, reports, events).
+- **Dependencies:** `pnpm audit`, then update.
+- **Secrets:** rotate all of them (JWT, code hashing, database, Gmail); confirm none ever entered git history.
+- **Website headers:** review the CSP and security headers.
+- **Uploads:** file type, size and decompression limits; image metadata stripped.
+- **Backups:** do a **restore drill** from backup into a fresh database.
+- **Privacy (India DPDP):** list what personal data is stored and for how long; check account deletion end to end.
+- **Admin login:** decide on stronger admin login (e.g. 2-step verification for staff).
+
+**Done when:**
+- Every finding is fixed or explicitly accepted by the owner.
+- A short report is saved as `docs/security-audit-<date>.md`.
+
+### Phase 9. Production readiness (launch)
+
+**Dependencies** (owner decisions):
+- final name and domain;
+- SMS provider + TRAI DLT registration;
+- maps provider;
+- AWS budget;
+- launch date.
+
+| Area | Proposed work |
+|---|---|
+| Data | PostgreSQL → **RDS** (PostGIS, point-in-time recovery, automated backups); Valkey → **ElastiCache**; images → **S3** (private photos stay private) |
+| Servers | Bigger instance or a managed container service (choice recorded in an ADR); API and worker scale separately |
+| Releases | API deploys from CI on merge to `main` → staging; production deploy needs a manual approval; migrations run as a separate release step |
+| Domain and email | Real domain: website on Vercel, `api.<domain>` on AWS; email sent from the domain (provider to choose, e.g. SES) with SPF/DKIM/DMARC |
+| Login hardening | Refresh token in an httpOnly cookie on the shared parent domain (planned in ADR-0014); 2-step verification for admins if decided in Phase 8 |
+| SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
+| Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
+| Quality | Playwright browser tests in CI for the main flows; a load test of search and login |
+| Legal pages | Privacy policy, terms of use, contact page (text from the owner) |
+| Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
+
+**Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
+
+### Later (not scheduled)
+
+- **Mobile apps** (`apps/mobile`), using the same API and OpenAPI contract.
+- **One account with both phone and email** (account linking).
+- **Address search on a map** (needs the maps provider).
+- **Kannada user interface** (search already understands Kannada).
+- **Monetization:** business plans, sponsored offers, QR redemption, reviews, rewards, AI recommendations. Each already has a feature flag that defaults to `false`; none is built.
+
+---
+
+## 14. Change log
+
+Newest first. **Every pull request adds an entry here** (see §0). Operational changes made without a PR (servers, accounts, DNS) get an entry too. Format:
+
+```
+### YYYY-MM-DD · PR #N (or "Operations, no PR") · <title> · <author: name, or "Claude (AI agent)">
+- What changed:
+- Why:
+- How it was verified:
+- Deploy / migration / env notes:
+- Follow-ups:
+```
+
+### 2026-10-01 · PR #9 · Roadmap, update rule and change log · Claude (AI agent), requested by the product owner
+- **What changed:**
+  - Added the mandatory update rule (banner at the top and §0).
+  - Added the detailed roadmap (§13): admin screens, Phases 5–9, later items.
+  - Added this change log, backfilled from the project history.
+- **Why:** teammates and agents must be able to pick the project up from this file alone.
+- **How it was verified:** documentation only; history checked against `git log` and the merged PRs.
+- **Deploy / migration / env notes:** none.
+
+### 2026-10-01 · PR #8 · Password login (ADR-0015) · Claude (AI agent)
+- **What changed:**
+  - Sign up with a code, then choose a password.
+  - Later logins use email or phone + password; code login stays available.
+  - Forgot password = code + new password.
+  - Change password on the Account page.
+  - Rules (owner): 8+ characters; common passwords and the user's own email/phone are refused.
+  - Argon2id hashing (Node built-in).
+  - 5 wrong tries lock the account for 15 minutes; change and reset end other sessions.
+  - Migration `0008`.
+  - Login, welcome and account screens updated.
+- **Why:** product owner request (needing a code on every new login was friction).
+- **How it was verified:**
+  - API 180 unit + 128 integration tests (22 new).
+  - Browser run of sign-up, password login, change, reset, and an existing user being asked to set a password.
+- **Deploy / migration / env notes:**
+  - The API was deployed to EC2 **before** merging (backward compatible); the website then auto-deployed.
+  - Migration 0008 ran on the server.
+- **Follow-ups:**
+  - Admins set their own passwords; `Admin@123` is refused by the policy.
+  - Phone password reset needs an SMS vendor.
+
+### 2026-10-01 · PR #7 · CLAUDE.md project handbook · Claude (AI agent)
+- **What changed:**
+  - CLAUDE.md rewritten as the single handbook.
+  - ARCHITECTURE.md phase table and the deployment guide updated.
+- **How it was verified:** facts checked against the repository and the live environments.
+
+### 2026-10-01 · Operations, no PR · Website moved to the Craftware Vercel team · Claude (AI agent), using the owner's accounts
+- **What changed:**
+  - The website was imported into the Vercel team **Craftware** as project `dodoom`, connected to `craftware-org/offer_platform_backend`, and deploys automatically from `main`.
+  - `dodoom.vercel.app` was moved from the old personal project to it.
+- **How it was verified:** the domain serves the new project from Mumbai (`bom1`), and pull requests now show a Vercel check.
+- **Follow-ups:** the owner may delete the old personal Vercel project `dodoom`.
+
+### 2026-10-01 · PR #6 · `admin:add-localities` CLI · Claude (AI agent)
+- **What changed:**
+  - New command to add areas to a city; running it twice adds nothing, and each addition is audited.
+  - Used on the preview server: 9 Hubballi + 7 Dharwad **test** areas, names checked against public sources.
+- **How it was verified:** run against a real local database (add, re-run, bad input), then on the server.
+- **Follow-ups:** replace the test areas with the owner's real list.
+
+### 2026-10-01 · Operations, no PR · Preview server live · Claude (AI agent), with the owner
+- **What changed:**
+  - EC2 `Offer-Platform` prepared with `setup-server.sh`: swap, firewall, key-only SSH, Docker, secrets generated on the server, nightly backups.
+  - **Elastic IP 13.235.201.166** attached.
+  - API live at `https://13-235-201-166.sslip.io`.
+  - The owner entered the Gmail App Password with `set-secret.sh`; email login is live.
+  - First SUPER_ADMIN granted to `offerplatform0101@gmail.com`.
+- **How it was verified:** HTTPS certificate, health checks, `/meta`, CORS, a code request, and a Gmail login check that sends no email.
+
+### 2026-10-01 · PR #5 · Website (`apps/web`) + API fixes · Claude (AI agent)
+- **What changed:**
+  - Next.js 16 website (ADR-0014): customer pages, login, business portal, admin review.
+  - Security policy (CSP) with a per-request nonce.
+  - Private images loaded with the login token.
+  - **Public images now send `Cross-Origin-Resource-Policy: cross-origin`**; browsers had been blocking every photo.
+  - `grant-role --email` (verified emails only).
+  - Setup-script fixes found on the real server; deploy scripts marked executable.
+- **How it was verified:**
+  - 20 web unit tests.
+  - Browser run of the full MVP flow against a local API and database (see §8).
+
+### 2026-10-01 · PR #4 · Phase 4: discovery, email login, preview mode, staging deployment · Claude (AI agent)
+- **What changed:**
+  - Search that understands price, %, "near me", areas, typos and Kannada.
+  - Near me with PostGIS, ranking, home sections.
+  - Email code login, protected against pre-account hijacking.
+  - `/meta` and preview mode.
+  - Docker image, Docker Compose, Caddy, deploy scripts (ADR-0013).
+- **How it was verified:** 167 unit + 119 integration tests; a local rehearsal of the server stack through HTTPS.
+
+### 2026-09-30 · PRs #1–#3 · Phases 1–3 · Claude (AI agent), approved by the product owner
+- **#1 Foundation:** configuration, PostGIS, logging, errors, phone code login, roles and permissions, audit log, CI.
+- **#2 Businesses:** verification by photo without ID documents (ADR-0012), categories, cities and localities, images, platform settings.
+- **#3 Offers:** 7 offer types, prices worked out on the server, price history, admin review of every offer, a worker that starts and ends offers on schedule.
+- **Decisions:** recorded as ADRs 0001–0013 (monorepo, NestJS + Drizzle + PostGIS, AWS Mumbai, money in paise, and more).
