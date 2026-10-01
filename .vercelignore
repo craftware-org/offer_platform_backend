@@ -1,0 +1,17 @@
+# Files never uploaded by `vercel deploy` (the CLI does not read .gitignore).
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+# Build output, caches, dependencies
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/.storage
+# Not needed to build the web app
+deploy/staging/backups
+apps/api/test
