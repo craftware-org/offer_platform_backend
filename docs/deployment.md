@@ -63,6 +63,7 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 | Preview login code (phone) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
 | Backup now | `bash backup.sh` → `backups/*.dump` |
 | Restore | `docker compose exec -T postgres pg_restore -U offer_platform -d offer_platform --clean < backups/<file>.dump` |
+| Add areas (localities) | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "Area One,Area Two"` (idempotent) |
 | First super admin | `docker compose exec api node dist/cli/grant-role.js --email <address> --role SUPER_ADMIN` (or `--phone <number>`), after that person has logged in once |
 
 ## Website on Vercel
