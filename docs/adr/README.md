@@ -17,5 +17,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0011](0011-aws-hosting.md) | AWS hosting, Mumbai region | Accepted |
 | [0012](0012-business-verification-without-identity-documents.md) | Business verification without identity documents | Accepted |
 | [0013](0013-preview-staging-on-single-ec2.md) | Team-only preview server on a single EC2 instance | Accepted |
+| [0014](0014-web-app-nextjs-on-vercel.md) | Web app: Next.js on Vercel, calling the API directly | Accepted |
 
 Template: [`template.md`](template.md)
