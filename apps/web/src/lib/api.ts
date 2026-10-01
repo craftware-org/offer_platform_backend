@@ -17,8 +17,9 @@ export class ApiError extends Error {
 /** Human message for any thrown value, including field errors ("phone: Invalid phone number"). */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    const fields = Object.entries(error.fields).map(([k, v]) => `${k}: ${v}`);
-    return fields.length ? `${error.message} (${fields.join('; ')})` : error.message;
+    const fields = Object.values(error.fields);
+    // Field messages are written for people ("Use at least 8 characters"); show them on their own.
+    return fields.length ? fields.join(' ') : error.message;
   }
   if (error instanceof TypeError) return 'Cannot reach the server. Check your connection and try again.';
   return error instanceof Error ? error.message : 'Something went wrong';
