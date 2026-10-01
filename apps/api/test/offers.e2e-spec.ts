@@ -557,6 +557,8 @@ describe('Offers: create → review → live → expire (real Postgres/PostGIS +
       expect(publicUrl).toBe(`/api/v1/media/offer-images/${imageId}/thumb`);
       const img = await ctx.http().get(publicUrl).expect(200);
       expect(img.headers['content-type']).toBe('image/webp');
+      // The website (another origin) embeds public photos with <img>.
+      expect(img.headers['cross-origin-resource-policy']).toBe('cross-origin');
 
       // Changing the photos of a live offer sends it back to review.
       await ctx

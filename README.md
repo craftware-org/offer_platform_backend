@@ -12,19 +12,20 @@ A local offers and business discovery platform, built, hosted and operated by **
 | 1 | Foundation: config, database, logging, errors, phone-OTP auth, roles/permissions, audit, CI | ✅ Done |
 | 2 | Businesses and verification, categories, cities/localities, image uploads | ✅ Done: [docs/business-workflow.md](docs/business-workflow.md) |
 | 3 | Offers: 7 types, server-side pricing, price history, admin review, scheduling/expiry worker | ✅ Done: [docs/offer-workflow.md](docs/offer-workflow.md) |
-| 4 | Customer discovery (search, near me, ranking), email login, preview server | ✅ Backend done: [docs/api.md](docs/api.md), [docs/deployment.md](docs/deployment.md) |
-| Web | Next.js app on Vercel (dodoom.vercel.app): customer, business and admin screens | Next |
+| 4 | Customer discovery (search, near me, ranking), email login, preview server | ✅ Done: [docs/api.md](docs/api.md), [docs/deployment.md](docs/deployment.md) |
+| Web | Next.js website: customer, business and admin screens ([ADR-0014](docs/adr/0014-web-app-nextjs-on-vercel.md)) | ✅ Preview live at https://dodoom.vercel.app |
 
 ## Repository layout
 
 ```
 apps/api/            Backend API (NestJS 12, TypeScript 6, Drizzle ORM, PostgreSQL + PostGIS, Valkey/Redis)
+apps/web/            Website (Next.js 16, React 19, Tailwind CSS 4): customers, business portal, admin
 docs/                Architecture decision records and guides
 docker-compose.yml   Local PostgreSQL/PostGIS and Valkey
 .github/workflows/   CI
 ```
 
-Planned later: `apps/web` (customer site and business portal), `apps/admin`, `apps/mobile`.
+Planned later: `apps/mobile`.
 
 ## Requirements
 
@@ -64,13 +65,25 @@ pnpm --filter @offer-platform/api start:worker:dev
 - Interactive API docs (not served in production): http://localhost:3000/api/docs
 - During development, OTP codes are printed to the API log (`[DEV SMS]`). No SMS is sent.
 
+### Website (apps/web)
+
+```bash
+cp apps/web/.env.example apps/web/.env.local     # NEXT_PUBLIC_API_URL=http://localhost:3000
+pnpm --filter @offer-platform/web dev -- --port 3001
+```
+
+Add `http://localhost:3001` to `CORS_ORIGINS` in `apps/api/.env` so the browser may call the local API.
+
 ### First administrator
 
-Log in once with your phone number, which creates the account, then run:
+Log in once (phone or email), which creates the account, then run one of:
 
 ```bash
 pnpm --filter @offer-platform/api admin:grant-role --phone 98XXXXXXXX --role SUPER_ADMIN
+pnpm --filter @offer-platform/api admin:grant-role --email you@example.com --role SUPER_ADMIN
 ```
+
+An email works only once it is verified (the person logged in with a code sent to it).
 
 ## Testing
 
