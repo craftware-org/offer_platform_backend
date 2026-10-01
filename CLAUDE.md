@@ -276,7 +276,7 @@ Images:
 **Product work (each needs approval first):**
 - Phase 5: engagement (saved offers, follow a business, share and contact-click tracking, report an offer).
 - Admin screens still missing on the website (the API already exists): categories, cities/areas, platform settings, users (suspend, roles), audit log.
-- Phases 6–9 as in §2.
+- Admin screens, then Phases 5–9: see the detailed plan in **§13 Roadmap**.
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -337,3 +337,185 @@ Images:
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
+
+---
+
+## 13. Roadmap (proposed: each phase needs approval before work starts)
+
+> **Status of this section:** a **proposal** written on 2026-10-01. Nothing below is approved or built unless it is marked ✅.
+> - **Before starting a phase:** explain the plan to the product owner, get approval, then mark it "Approved (date)" here. Big decisions get an ADR.
+> - **Order:** A first (small, and it removes command-line-only admin work), then 5 → 9. Phase 9 infrastructure tasks can run in parallel once the owner's decisions are made.
+> - **"Done when" for every phase also includes:**
+>   - integration tests against a real database;
+>   - a browser run of the new screens;
+>   - docs and this file updated;
+>   - CI green;
+>   - deployed to the preview.
+
+### A. Admin screens on the website (small, recommended next)
+
+**Why:** several admin jobs exist in the API but today need server commands or raw API calls.
+
+**Dependencies:** none. The API endpoints and permissions already exist.
+
+**Website** (`/admin/...`, each screen shown according to the admin's permissions):
+
+| Screen | What it does | Permission |
+|---|---|---|
+| Categories | Show the tree; add, rename, deactivate; reorder | `categories:manage` |
+| Cities and areas | Add or rename cities and localities; deactivate. Replaces `add-localities` for daily use | `locations:manage` |
+| Platform settings | Business verification requirements (`business.verification`); offer limits: max days, max photos (`offers.limits`) | `settings:manage` |
+| Users | Search, view, suspend or reactivate with a reason; grant or revoke ADMIN / SUPER_ADMIN | `users:read`, `users:manage-status`, `roles:assign` |
+| Audit log | Filter by user, entity, action and date; read-only | `audit:read` |
+
+**Server:** only small additions where a screen needs data the API doesn't return yet. Check [docs/api.md](docs/api.md) first.
+
+**Done when:**
+- Every admin task in §6 except server operations can be done in the browser.
+- `grant-role` and `add-localities` are needed only for bootstrapping.
+
+### Phase 5. Engagement
+
+**Goal:** customers keep and share offers, follow shops and report bad offers; businesses learn which offers interest people.
+
+**Dependencies:** none (A recommended first, so admins have screens to work the report queue).
+
+| Feature | Customer side | Business / admin side |
+|---|---|---|
+| Save offers | Heart button on offer cards and pages; a "Saved" page; ended offers marked as ended | Saves per offer (feeds Phase 7) |
+| Follow a business | "Follow" button on the business page; a "Following" list | Follower count |
+| Share | Share button (WhatsApp / copy link); the share is recorded | Share count |
+| Contact taps | Taps on Call / WhatsApp / Directions are recorded | Counts per offer and business |
+| Report an offer | "Report" with a reason (wrong price, expired, misleading, offensive, other) and an optional note | Admin **report queue**: dismiss, or suspend the offer (uses the existing moderation) |
+
+**Server (proposed):**
+- New tables:
+  - `saved_offers` (user + offer, unique);
+  - `business_follows`;
+  - `offer_reports` (reason, note, status, handled by);
+  - `engagement_events` (type, offer/business, time, optional user, **never coordinates**).
+- Endpoints:
+  - `/me/saved-offers`;
+  - `/me/follows`;
+  - `POST /offers/:slug/events` (rate-limited, no login needed);
+  - `POST /offers/:slug/reports` (login required, one open report per user per offer);
+  - `/admin/reports`.
+- New permission `reports:moderate`. Report decisions are audited.
+
+**Done when:**
+- A logged-in customer can save, follow, share and report.
+- Taps are counted.
+- Admins can handle reports end to end.
+
+### Phase 6. Notifications
+
+**Goal:** people hear about what matters to them without opening the site.
+
+**Dependencies:**
+- **Owner decision: push provider** (FCM proposed).
+- Email already works (Gmail SMTP in preview). Production needs a sender on the real domain, see Phase 9.
+
+**Channels:**
+- email (exists);
+- **in-app inbox** (new);
+- **push**: web push now if approved, mobile push later with the apps.
+
+**Events (proposed first set):**
+
+| To | When |
+|---|---|
+| Business | Business verified / rejected (with reason); offer approved / rejected / changes requested; offer about to end; offer reported and suspended |
+| Customer | A followed business publishes a new offer; a saved offer ends within 24 hours |
+| Admins | Daily summary: businesses and offers waiting for review, open reports |
+
+**Server:**
+- `notifications` table (the inbox) and `notification_preferences` (per user, per event type and channel).
+- A BullMQ queue `notifications` with retries and failure logging.
+- Templates in code, with the brand name taken from configuration.
+- Email: an unsubscribe link in every message; never sent to unverified emails.
+- Push: quiet hours.
+
+**Website:** bell icon with an unread count, an inbox page, and notification settings on the Account page.
+
+**Done when:**
+- Each event reaches the right person on the chosen channels.
+- Preferences are respected.
+- Failures are retried and logged.
+
+### Phase 7. Analytics
+
+**Goal:** businesses see how their offers perform; admins see the platform's health.
+
+**Dependencies:** Phase 5 (the events).
+
+**Server:**
+- Offer page views are recorded like the Phase 5 events.
+- A nightly worker job fills `daily_offer_stats` and `daily_business_stats`: views, saves, shares, contact taps, follows.
+- Raw events are kept for a limited time (to be decided); daily totals are kept long-term.
+- **No personal data** in analytics tables.
+
+**Business dashboard:**
+- Per offer and in total, for the last 7 / 30 days: views, saves, shares, calls, WhatsApp taps, directions.
+- The best-performing offer.
+- Simple charts; the charting library is chosen with an ADR.
+
+**Admin dashboard:**
+- New businesses and offers.
+- Review queue: size and age.
+- Active offers by city and category.
+- Reports.
+- Sign-ups and logins.
+
+**Done when:** both dashboards match the raw events in a test with known data.
+
+### Phase 8. Security audit
+
+**Goal:** find and fix weaknesses before real users arrive.
+
+**Checklist (proposed):**
+- **Standard review:** go through OWASP ASVS level 2 for login, sessions, access control, input checks, uploads, errors and logs.
+- **Access control:** every endpoint's permission check gets a test proving a lower role is refused.
+- **Rate limits:** checked against brute force and spam (codes, passwords, reports, events).
+- **Dependencies:** `pnpm audit`, then update.
+- **Secrets:** rotate all of them (JWT, code hashing, database, Gmail); confirm none ever entered git history.
+- **Website headers:** review the CSP and security headers.
+- **Uploads:** file type, size and decompression limits; image metadata stripped.
+- **Backups:** do a **restore drill** from backup into a fresh database.
+- **Privacy (India DPDP):** list what personal data is stored and for how long; check account deletion end to end.
+- **Admin login:** decide on stronger admin login (e.g. 2-step verification for staff).
+
+**Done when:**
+- Every finding is fixed or explicitly accepted by the owner.
+- A short report is saved as `docs/security-audit-<date>.md`.
+
+### Phase 9. Production readiness (launch)
+
+**Dependencies** (owner decisions):
+- final name and domain;
+- SMS provider + TRAI DLT registration;
+- maps provider;
+- AWS budget;
+- launch date.
+
+| Area | Proposed work |
+|---|---|
+| Data | PostgreSQL → **RDS** (PostGIS, point-in-time recovery, automated backups); Valkey → **ElastiCache**; images → **S3** (private photos stay private) |
+| Servers | Bigger instance or a managed container service (choice recorded in an ADR); API and worker scale separately |
+| Releases | API deploys from CI on merge to `main` → staging; production deploy needs a manual approval; migrations run as a separate release step |
+| Domain and email | Real domain: website on Vercel, `api.<domain>` on AWS; email sent from the domain (provider to choose, e.g. SES) with SPF/DKIM/DMARC |
+| Login hardening | Refresh token in an httpOnly cookie on the shared parent domain (planned in ADR-0014); 2-step verification for admins if decided in Phase 8 |
+| SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
+| Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
+| Quality | Playwright browser tests in CI for the main flows; a load test of search and login |
+| Legal pages | Privacy policy, terms of use, contact page (text from the owner) |
+| Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
+
+**Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
+
+### Later (not scheduled)
+
+- **Mobile apps** (`apps/mobile`), using the same API and OpenAPI contract.
+- **One account with both phone and email** (account linking).
+- **Address search on a map** (needs the maps provider).
+- **Kannada user interface** (search already understands Kannada).
+- **Monetization:** business plans, sponsored offers, QR redemption, reviews, rewards, AI recommendations. Each already has a feature flag that defaults to `false`; none is built.
