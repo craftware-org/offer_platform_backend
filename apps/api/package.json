@@ -25,6 +25,7 @@
     "db:migrate": "nest build && node dist/cli/migrate.js",
     "db:seed": "nest build && node dist/cli/seed.js",
     "admin:grant-role": "nest build && node dist/cli/grant-role.js",
+    "admin:add-localities": "nest build && node dist/cli/add-localities.js",
     "openapi:export": "nest build && node dist/cli/export-openapi.js"
   },
   "dependencies": {
