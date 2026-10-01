@@ -68,22 +68,20 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 
 ## Website on Vercel
 
-The website (`apps/web`) is the Vercel project **dodoom** (root directory `apps/web`, region `bom1` Mumbai): https://dodoom.vercel.app. Project environment variables:
+The website (`apps/web`) is the Vercel project **dodoom** in the **Craftware** team, connected to `craftware-org/offer_platform_backend`. Settings: root directory `apps/web`, region `bom1` (Mumbai, from `apps/web/vercel.json`).
+
+- **Production:** every push to `main` deploys to https://dodoom.vercel.app (also `dodoom-omega.vercel.app`).
+- **Previews:** every other branch and pull request gets its own preview URL. The API only allows the production origin in `CORS_ORIGINS`, so on preview URLs the API calls are blocked; add the preview origin temporarily if you need one.
+
+Project environment variables:
 
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://13-235-201-166.sslip.io` (the API origin) |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (use pnpm 12 from `packageManager`) |
+| `NEXT_TELEMETRY_DISABLED` | `1` |
 
-Deploy from the repository root (the project is linked in `.vercel/`, which is not committed):
-
-```bash
-vercel deploy --prod
-```
-
-`.vercelignore` keeps `.env` files, keys and build output out of the upload. When the Vercel GitHub app gets access to the `craftware-org` organisation, the project can be linked to the repository so that every push to `main` deploys automatically.
-
-The API must list the website origin in `CORS_ORIGINS` (already `https://dodoom.vercel.app` on the preview server).
+A manual `vercel deploy` is not needed. If you ever run one, run it from the repository root after `vercel link` to the Craftware project; `.vercelignore` keeps `.env` files, keys and build output out of the upload.
 
 ## Moving to the real domain later
 
