@@ -1,6 +1,6 @@
 # Offer Platform
 
-> **New here? Read [CLAUDE.md](CLAUDE.md) first:** status, environments, what is left, and the working rules.
+> **New here?** Read [information.md](information.md) for the complete picture (idea, decisions, tech stack, modules, phases), then [CLAUDE.md](CLAUDE.md) for status, operations and working rules.
 
 A local offers and business discovery platform, built, hosted and operated by **Craftware**. Local businesses publish verified offers for free, and nearby customers discover them. The first market is Hubballi-Dharwad, Karnataka.
 

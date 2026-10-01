@@ -24,6 +24,7 @@ In **every** pull request, before asking for merge:
    - add what you discovered;
    - mark phases "Approved (date)" or "✅ Done (date)".
 5. **Update the cheat sheet (§7), commands (§5, §6) and gotchas (§11)** if behaviour, commands or pitfalls changed.
+   Also update **[information.md](information.md)** (the complete project reference) when product, stack, modules, phases or decisions change.
 6. **Bump "Last updated"** at the top.
 
 Other rules:
@@ -71,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md
 
 ---
 
@@ -359,6 +360,7 @@ Images:
 
 ## 12. Document index
 
+- [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
 - [docs/adr/](docs/adr/README.md): every decision and why (0001–0015).
@@ -562,6 +564,28 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-02 · PR #11 · information.md, the complete project reference · Claude (AI agent), requested by the product owner
+- **What changed:** new `information.md` covering:
+  - the idea and business model;
+  - the owner's decisions over time;
+  - the original specification vs the final decisions;
+  - the final tech stack with versions;
+  - the architecture;
+  - every module in detail;
+  - the data model and key flows;
+  - security and privacy;
+  - phases with what each needs;
+  - a feature-by-feature checklist against the specification;
+  - environments and accounts;
+  - quality, open decisions and a glossary.
+
+  The CLAUDE.md update rule now includes keeping information.md current.
+- **Why:** anyone reading one file should understand the whole project.
+- **How it was verified:**
+  - content checked against the original specification (from the conversation history) and the code: tables, environment keys, versions, ranking weights;
+  - one inaccuracy found and fixed before committing (verification is not a ranking factor).
+- **Deploy / migration / env notes:** none.
 
 ### 2026-10-02 · PR #10 · Admin screens (roadmap A) · Claude (AI agent), plan approved by the product owner
 - **What changed:**
