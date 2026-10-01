@@ -27,3 +27,6 @@ Thumbs.db
 
 # staging server backups (only exist on the server)
 deploy/staging/backups/
+
+# Vercel CLI link
+.vercel/

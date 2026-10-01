@@ -256,6 +256,8 @@ describe('Businesses: registration → verification → public profile (real Pos
       const own = await getBinary(image.urls.full, bearer(owner.accessToken)).expect(200);
       expect(own.headers['content-type']).toBe('image/webp');
       expect(own.headers['cache-control']).toBe('private, no-store');
+      // Private photos must never be embeddable by other sites.
+      expect(own.headers['cross-origin-resource-policy']).toBe('same-origin');
       const meta = await sharp(own.body as Buffer).metadata();
       expect(meta.format).toBe('webp');
       expect(meta.exif).toBeUndefined();

@@ -45,6 +45,9 @@ export class MediaController {
 
   @Get('images/:imageId/:variant')
   @Header('Cache-Control', 'public, max-age=86400')
+  // Public images are embedded by the website and apps on other origins; helmet's default
+  // (same-origin) would make browsers refuse them. Private images keep the strict default.
+  @Header('Cross-Origin-Resource-Policy', 'cross-origin')
   async image(
     @Param('imageId', { schema: idParam }) imageId: string,
     @Param('variant', { schema: variantParam }) variant: z.infer<typeof variantParam>,

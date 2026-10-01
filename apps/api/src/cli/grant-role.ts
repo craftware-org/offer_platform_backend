@@ -1,7 +1,10 @@
 // Usage: pnpm admin:grant-role --phone +919845012345 --role SUPER_ADMIN
+//        pnpm admin:grant-role --email someone@example.com --role SUPER_ADMIN
 // Bootstraps the first administrator. The person must have logged in once (so the account exists).
+// An email counts only once it is verified (the person logged in with a code sent to it): an email
+// merely typed into a profile must never receive a role.
 import { parseArgs } from 'node:util';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import pg from 'pg';
 import { loadEnvFile } from '../config/load-env-file.js';
 import { parseEnv } from '../config/env.schema.js';
@@ -12,10 +15,12 @@ import { AuditAction, AuditService } from '../modules/audit/audit.service.js';
 import { normalizePhone } from '../common/phone/phone.js';
 import { users } from '../modules/users/users.schema.js';
 
-const { values } = parseArgs({ options: { phone: { type: 'string' }, role: { type: 'string' } } });
+const { values } = parseArgs({
+  options: { phone: { type: 'string' }, email: { type: 'string' }, role: { type: 'string' } },
+});
 const role = values.role as Role | undefined;
-if (!values.phone || !role || !(role in Role)) {
-  console.error(`Usage: --phone <number> --role <${Object.keys(Role).join('|')}>`);
+if (!values.phone === !values.email || !role || !(role in Role)) {
+  console.error(`Usage: (--phone <number> | --email <address>) --role <${Object.keys(Role).join('|')}>`);
   process.exit(1);
 }
 
@@ -24,10 +29,14 @@ const env = parseEnv(process.env);
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 1 });
 try {
   const db = createDatabase(pool);
-  const phone = normalizePhone(values.phone, env.DEFAULT_PHONE_COUNTRY);
-  const [user] = await db.select().from(users).where(eq(users.phone, phone));
+  const where = values.phone
+    ? eq(users.phone, normalizePhone(values.phone, env.DEFAULT_PHONE_COUNTRY))
+    : and(eq(users.email, values.email!.trim().toLowerCase()), isNotNull(users.emailVerifiedAt));
+  const [user] = await db.select().from(users).where(where);
   if (!user || user.status !== 'ACTIVE') {
-    console.error('No active account with that phone. Log in once via the app/API first.');
+    console.error(
+      `No active account with that ${values.phone ? 'phone' : 'verified email'}. Log in once via the app/API first.`,
+    );
     process.exitCode = 1;
   } else {
     await db.transaction(async (tx) => {

@@ -63,7 +63,26 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 | Preview login code (phone) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
 | Backup now | `bash backup.sh` → `backups/*.dump` |
 | Restore | `docker compose exec -T postgres pg_restore -U offer_platform -d offer_platform --clean < backups/<file>.dump` |
-| First super admin | `docker compose exec api node dist/cli/grant-role.js --phone <number> --role SUPER_ADMIN` (after that person has logged in once) |
+| First super admin | `docker compose exec api node dist/cli/grant-role.js --email <address> --role SUPER_ADMIN` (or `--phone <number>`), after that person has logged in once |
+
+## Website on Vercel
+
+The website (`apps/web`) is the Vercel project **dodoom** (root directory `apps/web`, region `bom1` Mumbai): https://dodoom.vercel.app. Project environment variables:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://13-235-201-166.sslip.io` (the API origin) |
+| `ENABLE_EXPERIMENTAL_COREPACK` | `1` (use pnpm 12 from `packageManager`) |
+
+Deploy from the repository root (the project is linked in `.vercel/`, which is not committed):
+
+```bash
+vercel deploy --prod
+```
+
+`.vercelignore` keeps `.env` files, keys and build output out of the upload. When the Vercel GitHub app gets access to the `craftware-org` organisation, the project can be linked to the repository so that every push to `main` deploys automatically.
+
+The API must list the website origin in `CORS_ORIGINS` (already `https://dodoom.vercel.app` on the preview server).
 
 ## Moving to the real domain later
 
