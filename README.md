@@ -1,5 +1,7 @@
 # Offer Platform
 
+> **New here? Read [CLAUDE.md](CLAUDE.md) first:** status, environments, what is left, and the working rules.
+
 A local offers and business discovery platform, built, hosted and operated by **Craftware**. Local businesses publish verified offers for free, and nearby customers discover them. The first market is Hubballi-Dharwad, Karnataka.
 
 > The product name is not final. The code uses the neutral codename `offer-platform`, and the display name is configuration (`APP_DISPLAY_NAME`). The GitHub repository keeps its historical name `offer_platform_backend`, but it holds every app (see [ADR-0010](docs/adr/0010-single-repo-monorepo.md)).

@@ -12,9 +12,9 @@ The backend is the single source of truth for a local offers and business discov
 
 | Client | Users | Location in this repo |
 |---|---|---|
-| Customer web (SEO public pages) | Customers, anonymous visitors | `apps/web` (Phase 4) |
-| Business portal | Business owners and staff | `apps/web` (Phase 2+) |
-| Admin panel | Admins, super admins | `apps/admin` (Phase 2+) |
+| Customer web (SEO public pages) | Customers, anonymous visitors | `apps/web` (live, ADR-0014) |
+| Business portal | Business owners and staff | `apps/web` (`/business`) |
+| Admin panel | Admins, super admins | `apps/web` (`/admin`) for the MVP; a separate `apps/admin` only if needed later |
 | Mobile apps | Customers, later businesses | `apps/mobile` (later) |
 
 The core loop: **a business publishes an offer → the platform moderates and distributes it → a nearby customer discovers it → the customer visits or contacts the business.**
@@ -331,7 +331,7 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 2 | SMS/OTP vendor + TRAI DLT registration status — **pending, owner discussing** | real OTP delivery (Phase 1 uses console provider) |
 | 3 | Maps/geocoding vendor (Google, Ola Maps, Mapbox/OSM) | address → coordinates (Phase 2) |
 | 4 | Push: FCM confirmed? | Phase 6 |
-| 5 | Final product name / domain (placeholder `offer-platform.example`) | public URLs, SEO (before launch) |
+| 5 | Final product name / domain (preview: "Dodoom" at dodoom.vercel.app + sslip.io API) | public URLs, SEO (before launch) |
 | 6 | MVP target date (team: 3 people at Craftware, who build, host and operate) | planning only |
 
 ---
@@ -344,7 +344,8 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 1 | Foundation: project, config, Docker (local services), DB + PostGIS, migrations, logging, errors, auth (OTP), roles/permissions, audit, CI | ✅ Done 2026-09-30: 22 unit + 38 integration tests green against real PostGIS + Valkey |
 | 2 | Businesses: registration, profile, location (PostGIS), photo-based verification ([ADR-0012](docs/adr/0012-business-verification-without-identity-documents.md)), admin management, dashboard API; categories, cities/localities and platform settings (moved up from Phase 4) | ✅ Done 2026-09-30: Business → Admin → Verified tested end to end (75 unit + 68 integration tests) |
 | 3 | Offers: 7 types, create/edit, validation, server-side pricing, price history, moderation (every offer), scheduling, expiry worker (BullMQ) | ✅ Done 2026-09-30: full lifecycle tested, including the real worker (145 unit + 100 integration tests) |
-| 4 | Discovery: full-text + trigram search (any script), query understanding, near me (PostGIS), filters, rule-based ranking, home sections; plus email OTP login, /meta, preview mode and staging deployment | ✅ Backend done 2026-09-30 (166 unit + 119 integration tests); web app next |
+| 4 | Discovery: full-text + trigram search (any script), query understanding, near me (PostGIS), filters, rule-based ranking, home sections; plus email OTP login, /meta, preview mode and staging deployment | ✅ Done 2026-10-01 (167 unit + 119 integration tests); preview API live on EC2 |
+| Web | Next.js website (`apps/web`): customer pages, login, business portal, admin review ([ADR-0014](docs/adr/0014-web-app-nextjs-on-vercel.md)) | ✅ Done 2026-10-01: browser end-to-end run of the full MVP flow; live at https://dodoom.vercel.app |
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | |
 | 6 | Notifications: infrastructure, preferences, dispatch | |
 | 7 | Analytics: ingestion, aggregates, business + admin analytics | |
