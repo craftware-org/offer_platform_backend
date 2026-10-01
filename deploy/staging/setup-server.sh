@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time preparation of a fresh Ubuntu 24.04 EC2 instance (run as the `ubuntu` user).
+# One-time preparation of a fresh Ubuntu 24.04+ EC2 instance (run as the `ubuntu` user).
 #   bash setup-server.sh <api-domain>        e.g.  bash setup-server.sh 13-233-10-20.sslip.io
 # Idempotent: safe to run again. Secrets are generated here and never leave the server.
 set -euo pipefail
@@ -13,6 +13,13 @@ sudo apt-get update -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades ufw ca-certificates curl openssl
 sudo dpkg-reconfigure -f noninteractive unattended-upgrades
+
+echo "==> 2 GB swap (small instances such as t3.micro run out of memory building the image)"
+if ! swapon --show | grep -q /swapfile; then
+  [ -f /swapfile ] || { sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile; }
+  sudo swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
 
 echo "==> Firewall: only SSH, HTTP and HTTPS"
 sudo ufw default deny incoming

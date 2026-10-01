@@ -13,8 +13,8 @@ Internet ──443──▶ Caddy (auto HTTPS) ──▶ api (NestJS) ──▶ 
 | Setting | Value |
 |---|---|
 | Region | Asia Pacific (Mumbai) `ap-south-1` |
-| AMI | Ubuntu Server 24.04 LTS (x86_64) |
-| Type | t3.medium |
+| AMI | Ubuntu Server 24.04 LTS or newer (x86_64); the current preview server runs 26.04 |
+| Type | t3.medium recommended. t3.micro (1 GB) works for a small team preview thanks to the 2 GB swap file `setup-server.sh` adds, but image builds are slow |
 | Key pair | new, ED25519, `.pem`, kept on the owner's computer only |
 | Security group | SSH 22 from *My IP*; HTTP 80 and HTTPS 443 from anywhere |
 | Storage | 30 GB gp3 |
@@ -30,6 +30,7 @@ ssh -i <key.pem> ubuntu@<ip> 'bash setup-server.sh <ip-with-dashes>.sslip.io'
 
 `setup-server.sh` does the following:
 - installs security updates and automatic security patches;
+- adds a 2 GB swap file;
 - turns on the firewall (22/80/443 only) and turns off SSH passwords;
 - installs Docker;
 - creates `/opt/offer-platform`;
