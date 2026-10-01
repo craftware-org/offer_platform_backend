@@ -17,6 +17,16 @@ export class OfferReader {
     private readonly categories: CategoriesService,
   ) {}
 
+  /** Offer titles by id, for admin activity feeds (missing ids are simply absent). */
+  async labelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: offers.id, title: offers.title })
+      .from(offers)
+      .where(inArray(offers.id, ids));
+    return new Map(rows.map((r) => [r.id, r.title]));
+  }
+
   async bundles(ids: string[], db: Executor = this.db): Promise<OfferBundle[]> {
     if (ids.length === 0) return [];
     const rows = await db.select().from(offers).where(inArray(offers.id, ids));

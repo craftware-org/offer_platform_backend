@@ -73,6 +73,7 @@ Clients should branch on `error.code`. Codes are stable and never renamed:
 | POST | `/admin/users/:id/roles` | `roles:assign` | Grant ADMIN / SUPER_ADMIN |
 | DELETE | `/admin/users/:id/roles/:role` | `roles:assign` | Revoke ADMIN / SUPER_ADMIN |
 | GET | `/admin/audit-logs` | `audit:read` | Audit trail, filterable |
+| GET | `/admin/activity` | `audit:read` | Audit trail with actor and item names filled in (used by the website's activity log); same filters |
 
 ## Endpoints (Phase 2): businesses, categories, locations
 

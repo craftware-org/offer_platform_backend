@@ -73,6 +73,27 @@ export class LocationsService {
     private readonly audit: AuditService,
   ) {}
 
+  /** City names by id, for admin activity feeds (missing ids are simply absent). */
+  async cityLabelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: cities.id, name: cities.name })
+      .from(cities)
+      .where(inArray(cities.id, ids));
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
+  /** Locality names ("Vidya Nagar, Hubballi") by id, for admin activity feeds. */
+  async localityLabelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: localities.id, name: localities.name, city: cities.name })
+      .from(localities)
+      .innerJoin(cities, eq(cities.id, localities.cityId))
+      .where(inArray(localities.id, ids));
+    return new Map(rows.map((r) => [r.id, `${r.name}, ${r.city}`]));
+  }
+
   async listCities(includeInactive = false): Promise<CityView[]> {
     const rows = await this.db
       .select()
