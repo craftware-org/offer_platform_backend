@@ -24,7 +24,7 @@ Internet ──443──▶ Caddy (auto HTTPS) ──▶ api (NestJS) ──▶ 
 
 ```bash
 # from the repository root on a dev machine
-scp -i <key.pem> deploy/staging/setup-server.sh ubuntu@<ip>:
+scp -i <key.pem> deploy/staging/setup-server.sh deploy/staging/.env.example ubuntu@<ip>:
 ssh -i <key.pem> ubuntu@<ip> 'bash setup-server.sh <ip-with-dashes>.sslip.io'
 ```
 

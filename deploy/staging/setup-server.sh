@@ -7,6 +7,9 @@ set -euo pipefail
 API_DOMAIN="${1:?usage: setup-server.sh <api-domain>}"
 APP_DIR=/opt/offer-platform
 STAGING="$APP_DIR/src/deploy/staging"
+# The .env template is copied next to this script (the source arrives later, with the first deploy).
+TEMPLATE="$(dirname "$(readlink -f "$0")")/.env.example"
+[ -f "$TEMPLATE" ] || { echo "Missing $TEMPLATE: copy deploy/staging/.env.example next to this script"; exit 1; }
 
 echo "==> System updates and automatic security patches"
 sudo apt-get update -y
@@ -45,23 +48,27 @@ sudo mkdir -p "$APP_DIR"
 sudo chown "$USER:$USER" "$APP_DIR"
 mkdir -p "$STAGING/backups"
 
-if [ ! -f "$STAGING/.env" ]; then
+if [ ! -s "$STAGING/.env" ]; then
   echo "==> Generating .env with fresh secrets"
   secret() { openssl rand -base64 48 | tr -d '\n/+=' | cut -c1-48; }
   PG=$(secret)
+  # Write to a private temp file first so a failure never leaves a partial .env behind.
+  TMP=$(mktemp "$STAGING/.env.XXXXXX")
   sed -e "s|^API_DOMAIN=.*|API_DOMAIN=${API_DOMAIN}|" \
       -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${PG}|" \
       -e "s|^DATABASE_URL=.*|DATABASE_URL=postgres://offer_platform:${PG}@postgres:5432/offer_platform|" \
       -e "s|^JWT_ACCESS_SECRET=.*|JWT_ACCESS_SECRET=$(secret)|" \
       -e "s|^OTP_HASH_SECRET=.*|OTP_HASH_SECRET=$(secret)|" \
-      "$STAGING/.env.example" > "$STAGING/.env"
-  chmod 600 "$STAGING/.env"
+      "$TEMPLATE" > "$TMP"
+  chmod 600 "$TMP"
+  mv "$TMP" "$STAGING/.env"
 else
   echo "==> .env already exists (kept)"
 fi
 
 echo "==> Nightly database backup at 02:30 (keeps 14 days)"
-( crontab -l 2>/dev/null | grep -v 'offer-platform backup'; \
+# `crontab -l` fails when no crontab exists yet; that must not abort the script.
+( { crontab -l 2>/dev/null || true; } | grep -v 'offer-platform backup' || true
   echo "30 2 * * * bash $STAGING/backup.sh >> $STAGING/backups/backup.log 2>&1 # offer-platform backup" ) | crontab -
 
 echo "==> Done. Log out and back in once (docker group), then deploy."
