@@ -2,7 +2,33 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-01.** Whoever finishes a piece of work updates the "Status" and "What's next" sections in the same pull request.
+> **Last updated: 2026-10-01.**
+
+> [!IMPORTANT]
+> **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
+
+---
+
+## 0. How to keep this file current (required for every change)
+
+In **every** pull request, before asking for merge:
+
+1. **Add an entry to §14 Change log**, at the top, using the format given there:
+   - date, PR number and author (person or agent);
+   - **what** changed, **why**, and **how it was verified** (tests, browser run, deploy check);
+   - anything the next person must know: new env vars, migrations, manual steps, follow-ups.
+2. **Update §2 Status** when a phase or feature changes state. Keep the test counts in sync with the latest run.
+3. **Update §3 What is running where** if you change servers, URLs, accounts, environment variables, DNS or deploy targets. Write *where* each secret lives, never the secret itself.
+4. **Update §10 What's next and §13 Roadmap:**
+   - remove what you finished;
+   - add what you discovered;
+   - mark phases "Approved (date)" or "✅ Done (date)".
+5. **Update the cheat sheet (§7), commands (§5, §6) and gotchas (§11)** if behaviour, commands or pitfalls changed.
+6. **Bump "Last updated"** at the top.
+
+Other rules:
+- Deeper docs (`docs/*.md`, ADRs) are updated too; this file links to them and does not replace them.
+- When an AI agent finishes a task, its last step is this update. If something was left unfinished, say so in the change log under **Follow-ups**.
 
 ---
 
@@ -44,7 +70,7 @@ This is the single entry point for **teammates and AI assistants** (Claude Code 
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log
 
 ---
 
@@ -519,3 +545,105 @@ Images:
 - **Address search on a map** (needs the maps provider).
 - **Kannada user interface** (search already understands Kannada).
 - **Monetization:** business plans, sponsored offers, QR redemption, reviews, rewards, AI recommendations. Each already has a feature flag that defaults to `false`; none is built.
+
+---
+
+## 14. Change log
+
+Newest first. **Every pull request adds an entry here** (see §0). Operational changes made without a PR (servers, accounts, DNS) get an entry too. Format:
+
+```
+### YYYY-MM-DD · PR #N (or "Operations, no PR") · <title> · <author: name, or "Claude (AI agent)">
+- What changed:
+- Why:
+- How it was verified:
+- Deploy / migration / env notes:
+- Follow-ups:
+```
+
+### 2026-10-01 · PR #9 · Roadmap, update rule and change log · Claude (AI agent), requested by the product owner
+- **What changed:**
+  - Added the mandatory update rule (banner at the top and §0).
+  - Added the detailed roadmap (§13): admin screens, Phases 5–9, later items.
+  - Added this change log, backfilled from the project history.
+- **Why:** teammates and agents must be able to pick the project up from this file alone.
+- **How it was verified:** documentation only; history checked against `git log` and the merged PRs.
+- **Deploy / migration / env notes:** none.
+
+### 2026-10-01 · PR #8 · Password login (ADR-0015) · Claude (AI agent)
+- **What changed:**
+  - Sign up with a code, then choose a password.
+  - Later logins use email or phone + password; code login stays available.
+  - Forgot password = code + new password.
+  - Change password on the Account page.
+  - Rules (owner): 8+ characters; common passwords and the user's own email/phone are refused.
+  - Argon2id hashing (Node built-in).
+  - 5 wrong tries lock the account for 15 minutes; change and reset end other sessions.
+  - Migration `0008`.
+  - Login, welcome and account screens updated.
+- **Why:** product owner request (needing a code on every new login was friction).
+- **How it was verified:**
+  - API 180 unit + 128 integration tests (22 new).
+  - Browser run of sign-up, password login, change, reset, and an existing user being asked to set a password.
+- **Deploy / migration / env notes:**
+  - The API was deployed to EC2 **before** merging (backward compatible); the website then auto-deployed.
+  - Migration 0008 ran on the server.
+- **Follow-ups:**
+  - Admins set their own passwords; `Admin@123` is refused by the policy.
+  - Phone password reset needs an SMS vendor.
+
+### 2026-10-01 · PR #7 · CLAUDE.md project handbook · Claude (AI agent)
+- **What changed:**
+  - CLAUDE.md rewritten as the single handbook.
+  - ARCHITECTURE.md phase table and the deployment guide updated.
+- **How it was verified:** facts checked against the repository and the live environments.
+
+### 2026-10-01 · Operations, no PR · Website moved to the Craftware Vercel team · Claude (AI agent), using the owner's accounts
+- **What changed:**
+  - The website was imported into the Vercel team **Craftware** as project `dodoom`, connected to `craftware-org/offer_platform_backend`, and deploys automatically from `main`.
+  - `dodoom.vercel.app` was moved from the old personal project to it.
+- **How it was verified:** the domain serves the new project from Mumbai (`bom1`), and pull requests now show a Vercel check.
+- **Follow-ups:** the owner may delete the old personal Vercel project `dodoom`.
+
+### 2026-10-01 · PR #6 · `admin:add-localities` CLI · Claude (AI agent)
+- **What changed:**
+  - New command to add areas to a city; running it twice adds nothing, and each addition is audited.
+  - Used on the preview server: 9 Hubballi + 7 Dharwad **test** areas, names checked against public sources.
+- **How it was verified:** run against a real local database (add, re-run, bad input), then on the server.
+- **Follow-ups:** replace the test areas with the owner's real list.
+
+### 2026-10-01 · Operations, no PR · Preview server live · Claude (AI agent), with the owner
+- **What changed:**
+  - EC2 `Offer-Platform` prepared with `setup-server.sh`: swap, firewall, key-only SSH, Docker, secrets generated on the server, nightly backups.
+  - **Elastic IP 13.235.201.166** attached.
+  - API live at `https://13-235-201-166.sslip.io`.
+  - The owner entered the Gmail App Password with `set-secret.sh`; email login is live.
+  - First SUPER_ADMIN granted to `offerplatform0101@gmail.com`.
+- **How it was verified:** HTTPS certificate, health checks, `/meta`, CORS, a code request, and a Gmail login check that sends no email.
+
+### 2026-10-01 · PR #5 · Website (`apps/web`) + API fixes · Claude (AI agent)
+- **What changed:**
+  - Next.js 16 website (ADR-0014): customer pages, login, business portal, admin review.
+  - Security policy (CSP) with a per-request nonce.
+  - Private images loaded with the login token.
+  - **Public images now send `Cross-Origin-Resource-Policy: cross-origin`**; browsers had been blocking every photo.
+  - `grant-role --email` (verified emails only).
+  - Setup-script fixes found on the real server; deploy scripts marked executable.
+- **How it was verified:**
+  - 20 web unit tests.
+  - Browser run of the full MVP flow against a local API and database (see §8).
+
+### 2026-10-01 · PR #4 · Phase 4: discovery, email login, preview mode, staging deployment · Claude (AI agent)
+- **What changed:**
+  - Search that understands price, %, "near me", areas, typos and Kannada.
+  - Near me with PostGIS, ranking, home sections.
+  - Email code login, protected against pre-account hijacking.
+  - `/meta` and preview mode.
+  - Docker image, Docker Compose, Caddy, deploy scripts (ADR-0013).
+- **How it was verified:** 167 unit + 119 integration tests; a local rehearsal of the server stack through HTTPS.
+
+### 2026-09-30 · PRs #1–#3 · Phases 1–3 · Claude (AI agent), approved by the product owner
+- **#1 Foundation:** configuration, PostGIS, logging, errors, phone code login, roles and permissions, audit log, CI.
+- **#2 Businesses:** verification by photo without ID documents (ADR-0012), categories, cities and localities, images, platform settings.
+- **#3 Offers:** 7 offer types, prices worked out on the server, price history, admin review of every offer, a worker that starts and ends offers on schedule.
+- **Decisions:** recorded as ADRs 0001–0013 (monorepo, NestJS + Drizzle + PostGIS, AWS Mumbai, money in paise, and more).
