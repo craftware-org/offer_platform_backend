@@ -1,0 +1,89 @@
+# Team-only preview/staging server on a single EC2 instance (ADR-0013).
+# Run from this folder on the server:  docker compose up -d --build
+# Only Caddy is reachable from the internet (ports 80/443). Postgres and Valkey are internal.
+name: offer-platform-staging
+
+x-api: &api
+  image: offer-platform-api:${IMAGE_TAG:-latest}
+  env_file: .env
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    valkey:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: offer_platform
+      POSTGRES_DB: offer_platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U offer_platform -d offer_platform']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8.0-alpine
+    restart: unless-stopped
+    command: ['valkey-server', '--appendonly', 'yes']
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-off: apply migrations and sync roles/permissions, then exit. api/worker start after it succeeds.
+  migrate:
+    image: offer-platform-api:${IMAGE_TAG:-latest}
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    command: ['sh', '-c', 'node dist/cli/migrate.js && node dist/cli/seed.js']
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *api
+    volumes:
+      - storage:/data/storage
+
+  worker:
+    <<: *api
+    command: ['node', 'dist/worker.js']
+    healthcheck:
+      disable: true
+
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  valkey-data:
+  storage:
+  caddy-data:
+  caddy-config:

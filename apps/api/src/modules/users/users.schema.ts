@@ -11,10 +11,12 @@ export const users = pgTable(
     /** E.164 (e.g. +919845012345). Cleared when the account is deleted. */
     phone: varchar('phone', { length: 20 }),
     name: varchar('name', { length: 100 }),
-    /** Stored lower-case. Not verified in the MVP. */
+    /** Stored lower-case. Only used for login once `emailVerifiedAt` is set. */
     email: varchar('email', { length: 254 }),
     status: userStatus('status').notNull().default('ACTIVE'),
     phoneVerifiedAt: timestamptz('phone_verified_at'),
+    /** Set only after the user proved control of the email with a code. Unverified emails never log anyone in. */
+    emailVerifiedAt: timestamptz('email_verified_at'),
     lastLoginAt: timestamptz('last_login_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

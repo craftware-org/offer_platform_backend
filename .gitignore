@@ -24,3 +24,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# staging server backups (only exist on the server)
+deploy/staging/backups/

@@ -64,6 +64,7 @@ const toLocalityView = (l: LocalityRow): LocalityView => ({
 });
 
 const ewkt = (p: GeoPoint) => `SRID=4326;POINT(${p.longitude} ${p.latitude})`;
+const slugifyPhrase = (phrase: string) => slugify(phrase, '');
 
 @Injectable()
 export class LocationsService {
@@ -145,6 +146,31 @@ export class LocationsService {
       cities: new Map(cityRows.map((c) => [c.id, toCityView(c)])),
       localities: new Map(localityRows.map((l) => [l.id, toLocalityView(l)])),
     };
+  }
+
+  /**
+   * An active locality whose name or slug matches a free-text phrase ("vidya nagar", "vidyanagar"),
+   * optionally within one city. Used to understand searches like "fashion in Vidya Nagar".
+   */
+  async findLocalityByPhrase(phrase: string, cityId?: string): Promise<LocalityView | null> {
+    const compact = phrase.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '');
+    const rows = await this.db
+      .select()
+      .from(localities)
+      .innerJoin(cities, eq(cities.id, localities.cityId))
+      .where(
+        and(
+          eq(localities.isActive, true),
+          eq(cities.isActive, true),
+          cityId ? eq(localities.cityId, cityId) : undefined,
+          sql`(lower(${localities.name}) = ${phrase.toLowerCase()}
+            or ${localities.slug} = ${slugifyPhrase(phrase)}
+            or regexp_replace(lower(${localities.name}), '[^[:alnum:]]', '', 'g') = ${compact})`,
+        ),
+      )
+      .limit(2);
+    // Ambiguous across cities (same name twice): don't guess.
+    return rows.length === 1 && rows[0] ? toLocalityView(rows[0].localities) : null;
   }
 
   async getLocalityBySlug(cityId: string, slug: string): Promise<LocalityView> {

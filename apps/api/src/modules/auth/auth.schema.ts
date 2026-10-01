@@ -1,13 +1,18 @@
-import { char, index, integer, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { char, index, integer, pgEnum, pgTable, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { createdAt, idColumn, timestamptz } from '../../infrastructure/database/columns.js';
 import { users } from '../users/users.schema.js';
 
-/** One OTP sent to a phone. Only an HMAC of the code is stored. */
+export const otpChannel = pgEnum('otp_channel', ['SMS', 'EMAIL']);
+export type OtpChannel = (typeof otpChannel.enumValues)[number];
+
+/** One login code sent to a phone (SMS) or an email address. Only an HMAC of the code is stored. */
 export const otpChallenges = pgTable(
   'otp_challenges',
   {
     id: idColumn(),
-    phone: varchar('phone', { length: 20 }).notNull(),
+    channel: otpChannel('channel').notNull().default('SMS'),
+    /** E.164 phone number or lower-case email address. */
+    destination: varchar('destination', { length: 254 }).notNull(),
     codeHash: char('code_hash', { length: 64 }).notNull(),
     attempts: integer('attempts').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull(),
@@ -16,7 +21,7 @@ export const otpChallenges = pgTable(
     consumedAt: timestamptz('consumed_at'),
     createdAt: createdAt(),
   },
-  (t) => [index('otp_challenges_phone_created_idx').on(t.phone, t.createdAt)],
+  (t) => [index('otp_challenges_destination_created_idx').on(t.destination, t.createdAt)],
 );
 
 /**

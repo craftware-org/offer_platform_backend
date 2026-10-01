@@ -78,7 +78,10 @@ describe('Authentication (phone OTP) — real Postgres + Valkey', () => {
       const phone = uniquePhone();
       await ctx.http().post(OTP_REQUEST).send({ phone: phone.input }).expect(202);
       const code = ctx.sms.lastCodeFor(phone.e164);
-      const [row] = await ctx.db.select().from(otpChallenges).where(eq(otpChallenges.phone, phone.e164));
+      const [row] = await ctx.db
+        .select()
+        .from(otpChallenges)
+        .where(eq(otpChallenges.destination, phone.e164));
       expect(row?.codeHash).toMatch(/^[0-9a-f]{64}$/);
       expect(row?.codeHash).not.toContain(code);
     });
@@ -172,7 +175,7 @@ describe('Authentication (phone OTP) — real Postgres + Valkey', () => {
       await ctx.db
         .update(otpChallenges)
         .set({ expiresAt: new Date(Date.now() - 1000) })
-        .where(eq(otpChallenges.phone, phone.e164));
+        .where(eq(otpChallenges.destination, phone.e164));
       const res = await ctx
         .http()
         .post(OTP_VERIFY)

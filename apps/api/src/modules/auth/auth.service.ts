@@ -5,7 +5,7 @@ import { DB, type Database } from '../../infrastructure/database/database.module
 import { AccessControlService } from '../access-control/access-control.service.js';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
 import { UsersService, type UserView } from '../users/users.service.js';
-import { OtpService } from './otp.service.js';
+import { OtpService, type OtpTarget } from './otp.service.js';
 import { normalizePhone } from '../../common/phone/phone.js';
 import { invalidRefreshToken, TokenService, type TokenPair } from './token.service.js';
 
@@ -26,7 +26,10 @@ interface RequestContext {
   requestId?: string;
 }
 
-/** Phone-OTP login: one flow for both registration and sign-in (ADR-0006). */
+/** Log in with a code sent to a phone (SMS) or to an email address. */
+export type LoginIdentity = { phone: string } | { email: string };
+
+/** One-time-code login by phone or email: one flow for registration and sign-in (ADR-0006, ADR-0013). */
 @Injectable()
 export class AuthService {
   constructor(
@@ -39,23 +42,31 @@ export class AuthService {
     private readonly audit: AuditService,
   ) {}
 
-  async requestOtp(rawPhone: string, clientIp: string) {
-    const phone = normalizePhone(rawPhone, this.config.DEFAULT_PHONE_COUNTRY);
-    // The response is identical for new and existing numbers, so it reveals nothing about accounts.
-    return this.otp.request(phone, clientIp);
+  async requestOtp(identity: LoginIdentity, clientIp: string) {
+    // The response is identical for new and existing accounts, so it reveals nothing about them.
+    return this.otp.request(this.target(identity), clientIp);
   }
 
-  async verifyOtp(rawPhone: string, code: string, ctx: RequestContext): Promise<LoginResult> {
-    const phone = normalizePhone(rawPhone, this.config.DEFAULT_PHONE_COUNTRY);
-    await this.otp.verify(phone, code);
+  async verifyOtp(identity: LoginIdentity, code: string, ctx: RequestContext): Promise<LoginResult> {
+    const target = this.target(identity);
+    await this.otp.verify(target.destination, code);
 
     const { user, created, tokens } = await this.db.transaction(async (tx) => {
-      const found = await this.users.findOrCreateByPhone(phone, tx);
+      const found =
+        target.channel === 'SMS'
+          ? await this.users.findOrCreateByPhone(target.destination, tx)
+          : await this.users.findOrCreateByVerifiedEmail(target.destination, tx);
       if (found.user.status === 'SUSPENDED') throw accountSuspended();
       await this.users.markLogin(found.user.id, tx);
       return { ...found, tokens: await this.tokens.issue(found.user.id, ctx.userAgent, tx) };
     });
     return { ...tokens, isNewUser: created, user: await this.users.getView(user.id) };
+  }
+
+  private target(identity: LoginIdentity): OtpTarget {
+    return 'phone' in identity
+      ? { channel: 'SMS', destination: normalizePhone(identity.phone, this.config.DEFAULT_PHONE_COUNTRY) }
+      : { channel: 'EMAIL', destination: identity.email.trim().toLowerCase() };
   }
 
   async refresh(refreshToken: string, ctx: RequestContext): Promise<TokenPair> {

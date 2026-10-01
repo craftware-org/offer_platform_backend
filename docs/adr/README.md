@@ -16,5 +16,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0010](0010-single-repo-monorepo.md) | Single repository (monorepo) with pnpm + Turborepo | Accepted |
 | [0011](0011-aws-hosting.md) | AWS hosting, Mumbai region | Accepted |
 | [0012](0012-business-verification-without-identity-documents.md) | Business verification without identity documents | Accepted |
+| [0013](0013-preview-staging-on-single-ec2.md) | Team-only preview server on a single EC2 instance | Accepted |
 
 Template: [`template.md`](template.md)

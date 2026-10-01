@@ -12,7 +12,8 @@ A local offers and business discovery platform, built, hosted and operated by **
 | 1 | Foundation: config, database, logging, errors, phone-OTP auth, roles/permissions, audit, CI | ✅ Done |
 | 2 | Businesses and verification, categories, cities/localities, image uploads | ✅ Done: [docs/business-workflow.md](docs/business-workflow.md) |
 | 3 | Offers: 7 types, server-side pricing, price history, admin review, scheduling/expiry worker | ✅ Done: [docs/offer-workflow.md](docs/offer-workflow.md) |
-| 4 | Customer discovery: search, filters, nearby, ranking | Next |
+| 4 | Customer discovery (search, near me, ranking), email login, preview server | ✅ Backend done: [docs/api.md](docs/api.md), [docs/deployment.md](docs/deployment.md) |
+| Web | Next.js app on Vercel (dodoom.vercel.app): customer, business and admin screens | Next |
 
 ## Repository layout
 
@@ -95,6 +96,7 @@ Commit the migration together with the code change. Never edit a migration that 
 - [docs/adr](docs/adr/README.md): why each technology was chosen
 - [docs/api.md](docs/api.md): API conventions and endpoints
 - [docs/business-workflow.md](docs/business-workflow.md): registration, verification, images
+- [docs/deployment.md](docs/deployment.md): preview server on EC2, deploys, backups
 - [docs/offer-workflow.md](docs/offer-workflow.md): offer types, pricing, lifecycle, worker · [docs/moderation.md](docs/moderation.md): admin review guide
 - [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md)
 

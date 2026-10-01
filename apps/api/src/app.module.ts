@@ -8,6 +8,7 @@ import { APP_CONFIG, ConfigModule, type AppConfig } from './config/config.module
 import { loggerParams } from './config/logger.js';
 import { DatabaseModule } from './infrastructure/database/database.module.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
+import { EmailModule } from './infrastructure/email/email.module.js';
 import { SmsModule } from './infrastructure/sms/sms.module.js';
 import { StorageModule } from './infrastructure/storage/storage.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
@@ -17,6 +18,8 @@ import { BusinessesModule } from './modules/businesses/businesses.module.js';
 import { CategoriesModule } from './modules/categories/categories.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { LocationsModule } from './modules/locations/locations.module.js';
+import { DiscoveryModule } from './modules/discovery/discovery.module.js';
+import { MetaModule } from './modules/meta/meta.controller.js';
 import { OffersModule } from './modules/offers/offers.module.js';
 import { PlatformSettingsModule } from './modules/platform-settings/platform-settings.module.js';
 import { UsersModule } from './modules/users/users.module.js';
@@ -31,6 +34,7 @@ import { UsersModule } from './modules/users/users.module.js';
     DatabaseModule,
     RedisModule,
     SmsModule,
+    EmailModule,
     StorageModule,
     HealthModule,
     AccessControlModule,
@@ -42,6 +46,8 @@ import { UsersModule } from './modules/users/users.module.js';
     CategoriesModule,
     BusinessesModule,
     OffersModule,
+    DiscoveryModule,
+    MetaModule,
   ],
   providers: [
     { provide: APP_PIPE, useFactory: createValidationPipe },

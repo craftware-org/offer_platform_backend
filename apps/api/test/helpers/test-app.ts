@@ -1,10 +1,11 @@
-import { randomInt } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Redis } from 'ioredis';
+import pg from 'pg';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { inject } from 'vitest';
@@ -12,10 +13,28 @@ import { AppModule } from '../../src/app.module.js';
 import { APP_OPTIONS, configureApp } from '../../src/app.setup.js';
 import { DB, type Database } from '../../src/infrastructure/database/database.module.js';
 import { REDIS } from '../../src/infrastructure/redis/redis.token.js';
+import { EmailProvider, type EmailMessage } from '../../src/infrastructure/email/email.module.js';
 import { SmsProvider } from '../../src/infrastructure/sms/sms.module.js';
+import { withDatabase } from '../global-setup.js';
 import { AccessControlService } from '../../src/modules/access-control/access-control.service.js';
 
 /** Captures outgoing SMS so tests can read the OTP, exactly as a user would from their phone. */
+/** Captures outgoing email so tests can read login codes, like a user reading their inbox. */
+export class CapturingEmailProvider extends EmailProvider {
+  readonly sent: EmailMessage[] = [];
+
+  async send(message: EmailMessage): Promise<void> {
+    this.sent.push(message);
+  }
+
+  lastCodeFor(to: string): string {
+    const last = [...this.sent].reverse().find((m) => m.to === to);
+    const code = last?.subject.match(/^(\d+) is your/)?.[1];
+    if (!code) throw new Error(`No login code was emailed to ${to}`);
+    return code;
+  }
+}
+
 export class CapturingSmsProvider extends SmsProvider {
   readonly sent: { to: string; message: string }[] = [];
 
@@ -39,15 +58,33 @@ export interface TestContext {
   db: Database;
   redis: Redis;
   sms: CapturingSmsProvider;
+  email: CapturingEmailProvider;
   close: () => Promise<void>;
 }
 
-/** Boots the real application (same modules, guards, pipes, filters) against the test containers. */
+/** Runs one statement against the server's maintenance database. */
+async function adminQuery(statement: string): Promise<void> {
+  const client = new pg.Client({ connectionString: inject('adminDatabaseUrl') });
+  await client.connect();
+  try {
+    await client.query(statement);
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Boots the real application (same modules, guards, pipes, filters) against the test containers.
+ * Each call gets its OWN database, cloned from the migrated template, so test files never see
+ * each other's data.
+ */
 export async function createTestApp(env: Record<string, string> = {}): Promise<TestContext> {
   const storageDir = await mkdtemp(join(tmpdir(), 'offer-platform-storage-'));
+  const database = `test_${randomBytes(6).toString('hex')}`;
+  await adminQuery(`CREATE DATABASE ${database} TEMPLATE ${inject('templateDatabase')}`);
   Object.assign(process.env, {
     NODE_ENV: 'test',
-    DATABASE_URL: inject('databaseUrl'),
+    DATABASE_URL: withDatabase(inject('adminDatabaseUrl'), database),
     REDIS_URL: inject('redisUrl'),
     JWT_ACCESS_SECRET: 'test-jwt-secret-that-is-long-enough-000000',
     OTP_HASH_SECRET: 'test-otp-secret-that-is-long-enough-111111',
@@ -59,9 +96,12 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
   });
 
   const sms = new CapturingSmsProvider();
+  const email = new CapturingEmailProvider();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(SmsProvider)
     .useValue(sms)
+    .overrideProvider(EmailProvider)
+    .useValue(email)
     .compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>(APP_OPTIONS);
   configureApp(app);
@@ -76,8 +116,10 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
     db,
     redis: app.get<Redis>(REDIS),
     sms,
+    email,
     close: async () => {
       await app.close();
+      await adminQuery(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);
       await rm(storageDir, { recursive: true, force: true });
     },
   };

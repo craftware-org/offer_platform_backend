@@ -344,7 +344,7 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 1 | Foundation: project, config, Docker (local services), DB + PostGIS, migrations, logging, errors, auth (OTP), roles/permissions, audit, CI | ✅ Done 2026-09-30: 22 unit + 38 integration tests green against real PostGIS + Valkey |
 | 2 | Businesses: registration, profile, location (PostGIS), photo-based verification ([ADR-0012](docs/adr/0012-business-verification-without-identity-documents.md)), admin management, dashboard API; categories, cities/localities and platform settings (moved up from Phase 4) | ✅ Done 2026-09-30: Business → Admin → Verified tested end to end (75 unit + 68 integration tests) |
 | 3 | Offers: 7 types, create/edit, validation, server-side pricing, price history, moderation (every offer), scheduling, expiry worker (BullMQ) | ✅ Done 2026-09-30: full lifecycle tested, including the real worker (145 unit + 100 integration tests) |
-| 4 | Discovery: categories, search, filters, nearby, feeds, detail pages, SEO data (slugs, OG fields, sitemap feed) | Customer finds a nearby offer |
+| 4 | Discovery: full-text + trigram search (any script), query understanding, near me (PostGIS), filters, rule-based ranking, home sections; plus email OTP login, /meta, preview mode and staging deployment | ✅ Backend done 2026-09-30 (166 unit + 119 integration tests); web app next |
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | |
 | 6 | Notifications: infrastructure, preferences, dispatch | |
 | 7 | Analytics: ingestion, aggregates, business + admin analytics | |
