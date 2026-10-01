@@ -25,6 +25,16 @@ export class BusinessReader {
     private readonly settings: PlatformSettingsService,
   ) {}
 
+  /** Business names by id, for admin activity feeds (missing ids are simply absent). */
+  async labelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: businesses.id, name: businesses.name })
+      .from(businesses)
+      .where(inArray(businesses.id, ids));
+    return new Map(rows.map((r) => [r.id, r.name]));
+  }
+
   /**
    * Bundles in the same order as `ids`; unknown ids are skipped.
    * Queries run one after another on purpose: `db` may be a transaction, i.e. a single

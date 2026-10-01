@@ -42,6 +42,12 @@ export interface User {
   permissions: string[];
 }
 
+/** A user as admins see it (GET /admin/users). */
+export interface AdminUser extends Omit<User, 'permissions'> {
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;

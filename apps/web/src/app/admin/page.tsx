@@ -31,7 +31,7 @@ function Admin() {
   if (tabs.length === 0) return <p className="card text-sm text-gray-600">You don&apos;t have admin access.</p>;
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Admin</h1>
+      <h1 className="text-xl font-semibold">Review queues</h1>
       <div className="flex gap-2">
         {tabs.map((t) => (
           <button key={t} className={tab === t ? 'btn-primary' : 'btn-secondary'} onClick={() => setTab(t)}>

@@ -1,5 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, ilike, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
 import { escapeLike } from '../../common/text/like.js';
@@ -47,6 +47,21 @@ export class UsersService {
     private readonly accessControl: AccessControlService,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Display names by id for admin activity feeds: name, else email, else phone.
+   * Deleted accounts show as "Deleted user" (their personal data is erased).
+   */
+  async labelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, status: users.status })
+      .from(users)
+      .where(inArray(users.id, ids));
+    return new Map(
+      rows.map((r) => [r.id, r.status === 'DELETED' ? 'Deleted user' : (r.name ?? r.email ?? r.phone ?? 'User')]),
+    );
+  }
 
   async findByPhone(phone: string, db: Executor = this.db): Promise<UserRow | null> {
     const [row] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);

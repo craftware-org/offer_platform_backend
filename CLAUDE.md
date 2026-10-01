@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-01.**
+> **Last updated: 2026-10-02.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -56,13 +56,14 @@ Other rules:
 | 4 | Discovery (search, near me, filters, ranking, home sections), **email OTP login**, `/meta`, preview mode, staging server | ✅ Done |
 | Web | Next.js website: customer pages, login, business portal, admin review (ADR-0014) | ✅ Done, live as a preview |
 | Auth+ | **Password login** after a one-time verification code; forgot password by code (ADR-0015) | ✅ Done 2026-10-01 |
+| A | **Admin screens**: users, categories, cities & areas, settings, activity log (in plain sentences) | ✅ Done 2026-10-02 |
 | 5 | Engagement: save/favourite, follow business, share tracking, contact-click tracking, report an offer | ⏳ Next (needs approval) |
 | 6 | Notifications: infrastructure, preferences, dispatch (push/email) | ⏳ |
 | 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ |
 | 8 | Security audit (findings fixed) | ⏳ |
 | 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
 
-**Tests (all must stay green):** API 180 unit + 128 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 20 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 180 unit + 131 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 26 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -70,7 +71,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens
 
 ---
 
@@ -109,7 +110,8 @@ apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, Postgre
   src/common/             Errors, response envelope, pagination, auth decorators, validation pipe, phone, slug
   src/infrastructure/     database (Drizzle, PostGIS helpers, migrate), redis, storage, images (sharp), sms, email
   src/modules/            users, access-control, auth, audit, platform-settings, locations, categories,
-                          businesses, offers, discovery, meta, health   (modules talk only via exported services)
+                          businesses, offers, discovery, meta, health, admin-activity (audit feed with names)
+                          (modules talk only via exported services)
   src/jobs/               BullMQ jobs (offer lifecycle)
   src/cli/                migrate, seed, grant-role, add-localities, export-openapi
   database/migrations/    SQL migrations (0000–0007); some PostGIS/search SQL is hand-written
@@ -186,6 +188,7 @@ It uploads the **committed** source (`git archive`, so no local files and no `.e
 |---|---|
 | Status / logs | `docker compose ps` · `docker compose logs -f --tail 100 api` (also `worker`, `caddy`) |
 | Phone login code (preview) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
+| Everyday admin work | **Use the website** (`/admin`): users and roles, categories, cities & areas, settings, activity log. The commands below are for bootstrapping and emergencies. |
 | Make someone admin | `docker compose exec api node dist/cli/grant-role.js --email <verified email> --role SUPER_ADMIN` (or `ADMIN`, or `--phone`) |
 | Add areas | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "A,B"` (idempotent) |
 | Change Gmail App Password | `./set-secret.sh SMTP_PASSWORD` (hidden prompt; restarts API) |
@@ -246,7 +249,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 | Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags) |
 | Account | `/login`, `/account` |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
-| Admin | `/admin`, `/admin/businesses/[id]`, `/admin/offers/[id]` |
+| Admin | `/admin` (review queues), `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
 Images:
 - **Public images** load directly from the API.
@@ -301,8 +304,7 @@ Images:
 
 **Product work (each needs approval first):**
 - Phase 5: engagement (saved offers, follow a business, share and contact-click tracking, report an offer).
-- Admin screens still missing on the website (the API already exists): categories, cities/areas, platform settings, users (suspend, roles), audit log.
-- Admin screens, then Phases 5–9: see the detailed plan in **§13 Roadmap**.
+- Phases 5–9: see the detailed plan in **§13 Roadmap**. (Admin screens are done.)
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -378,7 +380,7 @@ Images:
 >   - CI green;
 >   - deployed to the preview.
 
-### A. Admin screens on the website (small, recommended next)
+### A. Admin screens on the website — ✅ Done 2026-10-02 (PR #10)
 
 **Why:** several admin jobs exist in the API but today need server commands or raw API calls.
 
@@ -560,6 +562,23 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-02 · PR #10 · Admin screens (roadmap A) · Claude (AI agent), plan approved by the product owner
+- **What changed:**
+  - **Website `/admin`:** a section menu shown according to permissions, with these new screens:
+    - **Users:** search; detail page; suspend or reactivate with a reason; grant or remove Admin / Super admin (Super admin only; you can't remove your own Super admin role).
+    - **Categories:** tree; add; rename; hide or show; move up or down.
+    - **Cities & areas:** add or rename a city or area; hide or show.
+    - **Settings** (Super admin only): verification requirements and offer limits.
+    - **Activity log:** every audited action as a plain sentence ("Ravi verified business “Shoe House”: reason"), with before/after details, filters, and "see what this user did".
+  - **API:** new module `admin-activity` with `GET /admin/activity` (`audit:read`). It is the audit log with actor and item names filled in, looked up through each module's new `labelsFor(ids)` method (ADR-0002, no cross-module table access).
+- **Why:** roadmap item A, approved 2026-10-02. Admin work no longer needs server commands.
+- **How it was verified:**
+  - 3 new integration tests (names, area/setting labels, pagination and permissions).
+  - 6 new web unit tests for the sentences.
+  - Browser run of every screen against a local API and database, as a Super admin and as a plain Admin (Settings hidden and refused).
+- **Deploy / migration / env notes:** no migration. The API was deployed to EC2 before merging (new endpoint); the website deploys on merge.
+- **Follow-ups:** none. Next on the roadmap: Phase 5 (needs approval).
 
 ### 2026-10-01 · PR #9 · Roadmap, update rule and change log · Claude (AI agent), requested by the product owner
 - **What changed:**
