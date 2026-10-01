@@ -35,6 +35,8 @@ export interface User {
   name: string | null;
   email: string | null;
   emailVerified: boolean;
+  /** False until the user sets a password (ADR-0015). */
+  hasPassword: boolean;
   status: string;
   roles: string[];
   permissions: string[];

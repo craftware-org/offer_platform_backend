@@ -17,6 +17,9 @@ export const users = pgTable(
     phoneVerifiedAt: timestamptz('phone_verified_at'),
     /** Set only after the user proved control of the email with a code. Unverified emails never log anyone in. */
     emailVerifiedAt: timestamptz('email_verified_at'),
+    /** Argon2id hash in PHC format (ADR-0015). Null until the user sets a password. Never returned by the API. */
+    passwordHash: varchar('password_hash', { length: 255 }),
+    passwordChangedAt: timestamptz('password_changed_at'),
     lastLoginAt: timestamptz('last_login_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

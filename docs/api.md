@@ -41,6 +41,7 @@ Clients should branch on `error.code`. Codes are stable and never renamed:
 | `RATE_LIMITED` | 429 | Too many requests; wait `Retry-After` seconds |
 | `OTP_INVALID` | 400 | Wrong, expired or already-used code |
 | `OTP_ATTEMPTS_EXCEEDED` | 400 | Too many wrong codes; request a new one |
+| `INVALID_CREDENTIALS` | 401 | Wrong email/phone or password (deliberately the same for unknown accounts) |
 | `SERVICE_UNAVAILABLE` | 503 | A dependency (DB, Redis, SMS) is unavailable |
 | `INTERNAL_ERROR` | 500 | Unexpected error (details are logged, never returned) |
 
@@ -131,6 +132,10 @@ See [offer-workflow.md](offer-workflow.md) for types, pricing and lifecycle, and
 | POST | `/auth/otp/request` | public | Now `{ "phone": … }` **or** `{ "email": … }` (exactly one) |
 | POST | `/auth/otp/verify` | public | `{ phone \| email, code }` |
 | GET | `/meta` | public | App name, preview flag, login methods, radius options, feature flags |
+| POST | `/auth/password/login` | public | Email or phone + password ([ADR-0015](adr/0015-password-login.md)) |
+| POST | `/auth/password` | user | Set the first password |
+| POST | `/auth/password/change` | user | Change password (current required); ends other sessions, returns tokens |
+| POST | `/auth/password/reset` | public | Forgot password: code + new password; ends every session, returns tokens |
 
 ### `GET /discover/offers`
 

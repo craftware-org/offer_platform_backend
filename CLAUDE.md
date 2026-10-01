@@ -29,13 +29,14 @@ This is the single entry point for **teammates and AI assistants** (Claude Code 
 | 3 | Offers: 7 types, server-side pricing, price history, admin review of every offer, scheduling/expiry worker | ✅ Done |
 | 4 | Discovery (search, near me, filters, ranking, home sections), **email OTP login**, `/meta`, preview mode, staging server | ✅ Done |
 | Web | Next.js website: customer pages, login, business portal, admin review (ADR-0014) | ✅ Done, live as a preview |
+| Auth+ | **Password login** after a one-time verification code; forgot password by code (ADR-0015) | ✅ Done 2026-10-01 |
 | 5 | Engagement: save/favourite, follow business, share tracking, contact-click tracking, report an offer | ⏳ Next (needs approval) |
 | 6 | Notifications: infrastructure, preferences, dispatch (push/email) | ⏳ |
 | 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ |
 | 8 | Security audit (findings fixed) | ⏳ |
 | 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
 
-**Tests (all must stay green):** API 167 unit + 119 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 20 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 180 unit + 128 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 20 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -43,7 +44,7 @@ This is the single entry point for **teammates and AI assistants** (Claude Code 
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI
+- #6 `add-localities` CLI · #7 this handbook · #8 password login
 
 ---
 
@@ -172,11 +173,15 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 ## 7. How the product works (cheat sheet)
 
-**Accounts and login** ([docs/authentication.md](docs/authentication.md)):
-- No passwords. Log in with a 6-digit code sent to a phone (SMS, vendor pending) **or** an email address.
+**Accounts and login** ([docs/authentication.md](docs/authentication.md), ADR-0006 + ADR-0015):
+- **Sign up** with a 6-digit code sent to an email or phone (SMS vendor pending). The welcome screen then asks for a name and a **password**.
+- **Log in** with email/phone + password. "Log in with a code instead" stays available.
+- **Forgot password:** a code to the email/phone, then a new password. Every session ends.
+- Password rules: 8–128 characters, very common passwords and the user's own email/phone refused. Stored as Argon2id (Node built-in). 5 wrong tries lock the account for 15 minutes.
 - The access token (JWT, 15 min) is kept in memory. The refresh token (30 days) is single-use and rotates; reusing an old one revokes the whole session.
 - An email typed into a profile is **unverified** and never logs anyone in or receives a role. It becomes verified only after the person logs in with a code sent to it.
 - Phone and email logins are separate accounts for now.
+- Admin passwords are not set by anyone but the admin (log in with a code, then choose one). Common ones like `Admin@123` are refused by design.
 
 **Roles** ([docs/authorization.md](docs/authorization.md)):
 - Roles: CUSTOMER, BUSINESS_OWNER, BUSINESS_STAFF, ADMIN, SUPER_ADMIN.
@@ -328,7 +333,7 @@ Images:
 
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0014).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0015).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).

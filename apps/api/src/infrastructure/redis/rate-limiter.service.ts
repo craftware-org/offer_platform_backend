@@ -35,6 +35,17 @@ export class RateLimiterService {
     };
   }
 
+  /** Current count without recording a hit (0 when the window has expired). */
+  async peek(key: string): Promise<{ count: number; retryAfterSeconds: number }> {
+    const [count, ttlMs] = await Promise.all([this.redis.get(`rl:${key}`), this.redis.pttl(`rl:${key}`)]);
+    return { count: Number(count ?? 0), retryAfterSeconds: Math.max(1, Math.ceil(ttlMs / 1000)) };
+  }
+
+  /** Forgets a counter (e.g. failed logins after a successful one). */
+  async clear(key: string): Promise<void> {
+    await this.redis.del(`rl:${key}`);
+  }
+
   /** Records a hit and throws RATE_LIMITED when the limit is exceeded. */
   async consume(key: string, limit: number, windowSeconds: number): Promise<void> {
     const result = await this.hit(key, limit, windowSeconds);

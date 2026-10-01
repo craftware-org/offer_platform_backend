@@ -17,6 +17,8 @@ export interface UserView {
   email: string | null;
   /** True once the user logged in with a code sent to this email. */
   emailVerified: boolean;
+  /** True once the user has set a password (the hash itself is never exposed). */
+  hasPassword: boolean;
   status: UserRow['status'];
   roles: string[];
   createdAt: Date;
@@ -122,6 +124,34 @@ export class UsersService {
     return { user: inserted, created: true };
   }
 
+  /**
+   * The account a password login may target: an active-or-suspended user with this phone, or with
+   * this email ONLY if the email was verified with a code (an email typed into a profile never logs
+   * anyone in, ADR-0013/0015).
+   */
+  async findForPasswordLogin(identity: { phone: string } | { email: string }): Promise<UserRow | null> {
+    const where =
+      'phone' in identity
+        ? eq(users.phone, identity.phone)
+        : and(eq(users.email, identity.email), isNotNull(users.emailVerifiedAt));
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(and(where, ne(users.status, 'DELETED')))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async getRow(userId: string, db: Executor = this.db): Promise<UserRow> {
+    const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!row || row.status === 'DELETED') throw AppError.notFound('User');
+    return row;
+  }
+
+  async setPasswordHash(userId: string, passwordHash: string, tx: Executor): Promise<void> {
+    await tx.update(users).set({ passwordHash, passwordChangedAt: new Date() }).where(eq(users.id, userId));
+  }
+
   private async registered(userId: string, via: 'phone' | 'email', tx: Executor): Promise<void> {
     await this.accessControl.grantRole(userId, Role.CUSTOMER, null, tx);
     await this.audit.record(
@@ -179,6 +209,8 @@ export class UsersService {
         name: null,
         email: null,
         emailVerifiedAt: null,
+        passwordHash: null,
+        passwordChangedAt: null,
         status: 'DELETED',
         deletedAt: new Date(),
       })
@@ -312,6 +344,7 @@ export class UsersService {
       name: row.name,
       email: row.email,
       emailVerified: row.email !== null && row.emailVerifiedAt !== null,
+      hasPassword: row.passwordHash !== null,
       status: row.status,
       roles,
       createdAt: row.createdAt,
