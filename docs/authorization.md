@@ -12,7 +12,7 @@ All checks happen in the backend. Anything a frontend hides is only cosmetic.
 |---|---|
 | CUSTOMER | none (acts only on own data) |
 | BUSINESS_OWNER / BUSINESS_STAFF | none globally; access to a business comes from membership in `business_staff` |
-| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage`, `offers:read`, `offers:moderate`, `reports:moderate` |
+| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage`, `offers:read`, `offers:moderate`, `reports:moderate`, `analytics:read` |
 | SUPER_ADMIN | all ADMIN permissions + `roles:assign`, `settings:manage` |
 
 ### Business-scoped access
@@ -24,7 +24,7 @@ A user can manage a business, and its offers, only if they are listed for it in 
 Three global guards run in order on every request:
 
 1. **IpRateLimitGuard**: per-IP budget in Redis (shared by all instances).
-2. **AuthGuard**: requires a valid access token unless the endpoint is marked `@Public()`. It loads the user's current status, roles and permissions from the database, so a suspension or role change applies immediately.
+2. **AuthGuard**: requires a valid access token unless the endpoint is marked `@Public()`. It loads the user's current status, roles and permissions from the database, so a suspension or role change applies immediately. `@OptionalAuth()` endpoints (Phase 7: `POST /events`, `GET /discover/offers`) are public too, but a valid token, if sent, still identifies the caller; a missing or invalid token just means "anonymous" and never fails the request.
 3. **PermissionsGuard**: enforces `@RequirePermissions(...)`.
 
 Secure by default: a new endpoint without `@Public()` requires login.

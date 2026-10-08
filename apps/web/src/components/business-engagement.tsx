@@ -1,23 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { changeLabel, contactTaps, totalViews, type BusinessInsights } from '@/lib/insights';
 import { formatDateTime } from '@/lib/time';
+import { StatCard } from './range-picker';
 import { REPORT_REASONS } from './report-offer';
 
-interface Counts {
-  saves: number;
-  shares: number;
-  calls: number;
-  whatsapp: number;
-  website: number;
-  directions: number;
-}
-interface Engagement {
-  followers: number;
-  totals: Counts;
-  offers: (Counts & { offerId: string; title: string })[];
-}
 interface Warning {
   at: string;
   message: string;
@@ -25,32 +15,31 @@ interface Warning {
   offer: { id: string; title: string | null };
 }
 
-const COLUMNS: [keyof Counts, string][] = [
-  ['saves', 'Saves'],
-  ['shares', 'Shares'],
-  ['calls', 'Calls'],
-  ['whatsapp', 'WhatsApp'],
-  ['directions', 'Directions'],
-  ['website', 'Website'],
-];
 const reasonLabel = (r: string) => REPORT_REASONS.find(([v]) => v === r)?.[1] ?? r;
 
 /**
- * Warnings from the platform plus simple engagement totals (Phase 5; charts and date ranges come
- * in Phase 7). Taps are counted only for logged-in customers, so real interest is higher.
+ * Warnings from the platform plus the last 30 days at a glance (Phase 7); the full Performance page
+ * has charts, other periods and per-offer numbers.
  */
 export function BusinessEngagementPanel({ businessId }: { businessId: string }) {
-  const [data, setData] = useState<Engagement | null>(null);
+  const [data, setData] = useState<BusinessInsights | null>(null);
+  const [followers, setFollowers] = useState<number | null>(null);
   const [warnings, setWarnings] = useState<Warning[]>([]);
 
   useEffect(() => {
-    api<Engagement>(`/me/businesses/${businessId}/engagement`)
+    api<BusinessInsights>(`/me/businesses/${businessId}/insights`, { query: { days: 30 } })
       .then(setData)
       .catch(() => setData(null));
+    api<{ followers: number }>(`/me/businesses/${businessId}/engagement`)
+      .then((e) => setFollowers(e.followers))
+      .catch(() => setFollowers(null));
     api<Warning[]>(`/me/businesses/${businessId}/warnings`)
       .then(setWarnings)
       .catch(() => setWarnings([]));
   }, [businessId]);
+
+  const t = data?.totals;
+  const p = data?.previous;
 
   return (
     <>
@@ -69,55 +58,27 @@ export function BusinessEngagementPanel({ businessId }: { businessId: string }) 
         </section>
       )}
 
-      {data && (
+      {t && p && (
         <section className="card space-y-3">
-          <h2 className="font-semibold">How customers interact with you</h2>
-          <div className="grid grid-cols-3 gap-2 text-center sm:grid-cols-7">
-            <Stat label="Followers" value={data.followers} />
-            {COLUMNS.map(([key, label]) => (
-              <Stat key={key} label={label} value={data.totals[key]} />
-            ))}
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-semibold">Last 30 days</h2>
+            {followers !== null && (
+              <span className="text-sm text-gray-600">
+                · {followers} {followers === 1 ? 'follower' : 'followers'} in total
+              </span>
+            )}
+            <Link href={`/business/${businessId}/insights`} className="btn-secondary ml-auto py-1.5">
+              See performance
+            </Link>
           </div>
-          {data.offers.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-500">
-                    <th className="py-1 pr-3 font-medium">Offer</th>
-                    {COLUMNS.map(([key, label]) => (
-                      <th key={key} className="px-2 py-1 text-right font-medium">
-                        {label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {data.offers.map((o) => (
-                    <tr key={o.offerId}>
-                      <td className="py-1 pr-3">{o.title}</td>
-                      {COLUMNS.map(([key]) => (
-                        <td key={key} className="px-2 py-1 text-right tabular-nums">
-                          {o[key]}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="text-xs text-gray-500">Counted for logged-in customers only. Charts by date are coming later.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatCard label="Page views" value={totalViews(t)} change={changeLabel(totalViews(t), totalViews(p))} />
+            <StatCard label="Contact taps" value={contactTaps(t)} change={changeLabel(contactTaps(t), contactTaps(p))} />
+            <StatCard label="Saves" value={t.saves} change={changeLabel(t.saves, p.saves)} />
+            <StatCard label="Shares" value={t.shares} change={changeLabel(t.shares, p.shares)} />
+          </div>
         </section>
       )}
     </>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg bg-gray-50 p-2">
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-gray-600">{label}</p>
-    </div>
   );
 }

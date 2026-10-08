@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Module, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, Ip, Module, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { CurrentPrincipal } from '../../common/auth/decorators.js';
+import { CurrentPrincipal, OptionalAuth, OptionalPrincipal } from '../../common/auth/decorators.js';
 import type { Principal } from '../../common/auth/principal.js';
 import { pageQuerySchema } from '../../common/http/pagination.js';
+import { Role } from '../access-control/access-control.catalog.js';
 import { BusinessesModule } from '../businesses/businesses.module.js';
 import { OffersModule } from '../offers/offers.module.js';
 import { EngagementService, TRACKABLE_EVENTS } from './engagement.service.js';
@@ -17,10 +18,12 @@ const eventSchema = z
     type: z.enum(TRACKABLE_EVENTS),
     offerId: z.uuid().optional(),
     businessId: z.uuid().optional(),
+    /** Random id the browser keeps for anonymous visitors (dedupe only; never linked to a person). */
+    visitorId: z.uuid().optional(),
   })
   .refine((v) => !!v.offerId !== !!v.businessId, { message: 'Provide either offerId or businessId', path: ['offerId'] });
 
-/** Everything here needs a logged-in user (owner decision 2026-10-03). */
+/** Everything here needs a logged-in user, except recording views and taps (owner decision 2026-10-08). */
 @ApiTags('Engagement')
 @ApiBearerAuth()
 @Controller()
@@ -83,13 +86,24 @@ export class EngagementController {
   }
 
   @Post('events')
+  @OptionalAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary:
-      'Record a share or contact tap (OFFER_SHARED, CALL_CLICKED, WHATSAPP_CLICKED, WEBSITE_CLICKED, DIRECTIONS_CLICKED) on an offer or business',
+      'Record a page view (OFFER_VIEWED, BUSINESS_VIEWED) or a share/contact tap (OFFER_SHARED, CALL_CLICKED, ' +
+      'WHATSAPP_CLICKED, WEBSITE_CLICKED, DIRECTIONS_CLICKED). Open to everyone; anonymous callers send visitorId.',
   })
-  async track(@Body({ schema: eventSchema }) body: z.infer<typeof eventSchema>, @CurrentPrincipal() p: Principal) {
-    await this.engagement.track(p.userId, body.type, { offerId: body.offerId, businessId: body.businessId });
+  async track(
+    @Body({ schema: eventSchema }) body: z.infer<typeof eventSchema>,
+    @OptionalPrincipal() p: Principal | undefined,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    const isAdmin = !!p && (p.roles.includes(Role.ADMIN) || p.roles.includes(Role.SUPER_ADMIN));
+    await this.engagement.track({ userId: p?.userId, visitorId: body.visitorId, isAdmin, userAgent, ip }, body.type, {
+      offerId: body.offerId,
+      businessId: body.businessId,
+    });
   }
 
   @Get('me/businesses/:id/engagement')

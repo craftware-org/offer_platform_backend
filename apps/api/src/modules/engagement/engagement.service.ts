@@ -1,8 +1,10 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, lt } from 'drizzle-orm';
 import type { Redis } from 'ioredis';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { Page, type PageQuery } from '../../common/http/pagination.js';
+import { hashIp, isLikelyBot } from '../../common/http/visitors.js';
+import { APP_CONFIG, type AppConfig } from '../../config/config.module.js';
 import { DB, type Database } from '../../infrastructure/database/database.module.js';
 import { RateLimiterService } from '../../infrastructure/redis/rate-limiter.service.js';
 import { REDIS } from '../../infrastructure/redis/redis.token.js';
@@ -18,8 +20,13 @@ import {
   type AnalyticsEventType,
 } from './engagement.schema.js';
 
-/** Taps the website may record (Phase 5). Saves and follows are recorded by their own endpoints. */
+/**
+ * Events the website may record: page views (Phase 7) and share/contact taps (Phase 5). Saves and
+ * follows are recorded by their own endpoints.
+ */
 export const TRACKABLE_EVENTS = [
+  'OFFER_VIEWED',
+  'BUSINESS_VIEWED',
   'OFFER_SHARED',
   'CALL_CLICKED',
   'WHATSAPP_CLICKED',
@@ -27,11 +34,31 @@ export const TRACKABLE_EVENTS = [
   'DIRECTIONS_CLICKED',
 ] as const;
 export type TrackableEvent = (typeof TRACKABLE_EVENTS)[number];
+const VIEW_EVENTS: ReadonlySet<TrackableEvent> = new Set(['OFFER_VIEWED', 'BUSINESS_VIEWED']);
+
+/**
+ * Who did something: a logged-in user, or an anonymous visitor identified only by a random id the
+ * browser keeps (owner decision 2026-10-08: everyone is counted; nothing identifying is stored).
+ */
+export interface Actor {
+  userId?: string;
+  visitorId?: string;
+  isAdmin?: boolean;
+  userAgent?: string;
+  /** Used only for a short-lived, hashed rate-limit key; never stored. */
+  ip?: string;
+}
 
 /** The same person tapping the same thing again within this window counts once. */
 const DEDUPE_SECONDS = 30 * 60;
 /** Generous cap per person; real use is far below it. */
 const EVENTS_PER_USER_PER_HOUR = 300;
+/**
+ * Anonymous events counted per IP address per hour. Many people can share one mobile IP, so this is
+ * high; it only stops one machine inflating numbers by inventing visitor ids. Extra events are
+ * skipped quietly (ADR-0017).
+ */
+const ANONYMOUS_EVENTS_PER_IP_PER_HOUR = 1000;
 /** "Saved" lists are kept small in the MVP; older saves beyond this are not shown. */
 const SAVED_LIST_CAP = 500;
 
@@ -73,6 +100,7 @@ export class EngagementService {
   constructor(
     @Inject(DB) private readonly db: Database,
     @Inject(REDIS) private readonly redis: Redis,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly rateLimiter: RateLimiterService,
     private readonly offers: OffersPublicService,
     private readonly offerReader: OfferReader,
@@ -191,31 +219,56 @@ export class EngagementService {
   // ---- Taps ------------------------------------------------------------------------------------
 
   /**
-   * Records a share or contact tap by a logged-in user on an offer or a business page.
-   * Repeated taps on the same thing within 30 minutes count once. Always succeeds silently for
-   * duplicates, so the website never needs to care.
+   * Records a page view or a share/contact tap on an offer or a business page, by anyone
+   * (owner decision 2026-10-08). The same person or visitor doing the same thing again within
+   * 30 minutes counts once. Anonymous requests that look like bots are ignored, and so are views
+   * by the shop's own staff and by admins. Views never store who viewed (ADR-0017).
+   * Always succeeds silently for skipped events, so the website never needs to care.
    */
-  async track(userId: string, type: TrackableEvent, target: { offerId?: string; businessId?: string }): Promise<void> {
-    await this.rateLimiter.consume(`evt:user:${userId}`, EVENTS_PER_USER_PER_HOUR, 3600);
+  async track(actor: Actor, type: TrackableEvent, target: { offerId?: string; businessId?: string }): Promise<void> {
+    const who = actor.userId ? `u:${actor.userId}` : actor.visitorId ? `v:${actor.visitorId}` : null;
+    if (!who) throw AppError.validation({ visitorId: 'A visitor id is required when not logged in' });
+    await this.rateLimiter.consume(`evt:${who}`, EVENTS_PER_USER_PER_HOUR, 3600);
+
     let businessId: string;
     let offerId: string | null = null;
-    if (target.offerId) {
+    if (target.offerId && type !== 'BUSINESS_VIEWED') {
       const offer = await this.offers.getVisibleById(target.offerId);
       businessId = offer.business.id;
       offerId = offer.id;
-    } else if (target.businessId && type !== 'OFFER_SHARED') {
+    } else if (target.businessId && type !== 'OFFER_SHARED' && type !== 'OFFER_VIEWED') {
       businessId = (await this.businesses.getPublicById(target.businessId)).id;
     } else {
-      throw AppError.validation({ offerId: 'An offer is required for this event' });
+      throw AppError.validation(
+        type === 'BUSINESS_VIEWED'
+          ? { businessId: 'A business is required for this event' }
+          : { offerId: 'An offer is required for this event' },
+      );
     }
-    const first = await this.redis.set(
-      `evt:dedupe:${userId}:${type}:${offerId ?? businessId}`,
-      '1',
-      'EX',
-      DEDUPE_SECONDS,
-      'NX',
-    );
-    if (first) await this.record(type, businessId, offerId, userId);
+
+    if (!actor.userId && isLikelyBot(actor.userAgent)) return;
+    const isView = VIEW_EVENTS.has(type);
+    if (isView && actor.userId) {
+      if (actor.isAdmin) return;
+      if ((await this.businesses.memberUserIds(businessId)).includes(actor.userId)) return;
+    }
+
+    const first = await this.redis.set(`evt:dedupe:${who}:${type}:${offerId ?? businessId}`, '1', 'EX', DEDUPE_SECONDS, 'NX');
+    if (!first) return;
+    if (!actor.userId) {
+      const perIp = await this.rateLimiter.hit(`evt:ip:${hashIp(actor.ip, this.config.OTP_HASH_SECRET)}`, ANONYMOUS_EVENTS_PER_IP_PER_HOUR, 3600);
+      if (!perIp.allowed) return;
+    }
+    await this.record(type, businessId, offerId, isView ? null : (actor.userId ?? null));
+  }
+
+  /** Raw events older than the retention period are deleted by the worker (180 days, ADR-0017). */
+  async purgeEventsBefore(cutoff: Date): Promise<number> {
+    const deleted = await this.db
+      .delete(analyticsEvents)
+      .where(lt(analyticsEvents.createdAt, cutoff))
+      .returning({ id: analyticsEvents.id });
+    return deleted.length;
   }
 
   // ---- Business dashboard ------------------------------------------------------------------------
@@ -264,7 +317,7 @@ export class EngagementService {
     return { followers: followers?.value ?? 0, totals, offers };
   }
 
-  private async record(type: AnalyticsEventType, businessId: string, offerId: string | null, userId: string) {
+  private async record(type: AnalyticsEventType, businessId: string, offerId: string | null, userId: string | null) {
     await this.db.insert(analyticsEvents).values({ type, businessId, offerId, userId });
   }
 }

@@ -1,8 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Headers, Ip, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import { Public } from '../../common/auth/decorators.js';
+import { OptionalAuth, OptionalPrincipal, Public } from '../../common/auth/decorators.js';
+import type { Principal } from '../../common/auth/principal.js';
 import { pageQuerySchema } from '../../common/http/pagination.js';
+import { AnalyticsService } from '../analytics/analytics.service.js';
 import { DiscoveryService } from './discovery.service.js';
 import { MAX_RADIUS_KM } from './ranking.js';
 
@@ -41,7 +43,10 @@ const homeQuery = z.object(location).refine(bothOrNeither, pointMessage);
 @Public()
 @Controller('discover')
 export class DiscoveryController {
-  constructor(private readonly discovery: DiscoveryService) {}
+  constructor(
+    private readonly discovery: DiscoveryService,
+    private readonly analytics: AnalyticsService,
+  ) {}
 
   @Get('offers')
   @ApiOperation({
@@ -50,12 +55,30 @@ export class DiscoveryController {
       '"fashion in Vidya Nagar"; meta.interpretation shows how it was read. lat/lng are used only for this ' +
       'request and are never stored.',
   })
-  search(@Query({ schema: searchQuery }) query: z.infer<typeof searchQuery>) {
+  @OptionalAuth()
+  async search(
+    @Query({ schema: searchQuery }) query: z.infer<typeof searchQuery>,
+    @OptionalPrincipal() principal: Principal | undefined,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
     const { maxPriceRupees, ...rest } = query;
-    return this.discovery.search({
+    const page = await this.discovery.search({
       ...rest,
       ...(maxPriceRupees !== undefined ? { maxPrice: Math.round(maxPriceRupees * 100) } : {}),
     });
+    // What people look for (Phase 7, ADR-0017): typed searches only, first page only.
+    if (query.q && query.page === 1) {
+      await this.analytics.recordSearch({
+        query: query.q,
+        citySlug: query.city,
+        results: page.meta.totalItems,
+        ip,
+        userAgent,
+        loggedIn: !!principal,
+      });
+    }
+    return page;
   }
 
   @Get('home')

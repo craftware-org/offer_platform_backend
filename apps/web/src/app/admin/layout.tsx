@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 /** Admin sections; each is shown only to admins with its permission (the API enforces it anyway). */
 const SECTIONS: { href: string; label: string; permission: string }[] = [
   { href: '/admin', label: 'Review', permission: 'businesses:read' },
+  { href: '/admin/insights', label: 'Insights', permission: 'analytics:read' },
   { href: '/admin/reports', label: 'Reports', permission: 'reports:moderate' },
   { href: '/admin/users', label: 'Users', permission: 'users:read' },
   { href: '/admin/categories', label: 'Categories', permission: 'categories:manage' },

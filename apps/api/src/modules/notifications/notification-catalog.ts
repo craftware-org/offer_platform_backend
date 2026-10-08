@@ -16,6 +16,7 @@ export const NOTIFICATION_TYPES = [
   'FOLLOWED_SHOP_NEW_OFFER',
   'SAVED_OFFER_ENDING',
   'ADMIN_DAILY_SUMMARY',
+  'BUSINESS_WEEKLY_SUMMARY',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -35,6 +36,7 @@ export const CATALOG: Record<NotificationType, { audience: Audience; label: stri
   FOLLOWED_SHOP_NEW_OFFER: { audience: 'CUSTOMER', label: 'A shop you follow posted a new offer' },
   SAVED_OFFER_ENDING: { audience: 'CUSTOMER', label: 'A saved offer ends within a day' },
   ADMIN_DAILY_SUMMARY: { audience: 'ADMIN', label: 'Daily summary of work waiting for admins' },
+  BUSINESS_WEEKLY_SUMMARY: { audience: 'BUSINESS', label: 'Weekly summary of how your offers did' },
 };
 
 export interface Channels {

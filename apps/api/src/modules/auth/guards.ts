@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY, PERMISSIONS_KEY } from '../../common/auth/decorators.js';
+import { IS_PUBLIC_KEY, OPTIONAL_AUTH_KEY, PERMISSIONS_KEY } from '../../common/auth/decorators.js';
 import type { AuthenticatedRequest } from '../../common/auth/principal.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { APP_CONFIG, type AppConfig } from '../../config/config.module.js';
@@ -26,6 +26,7 @@ export class IpRateLimitGuard implements CanActivate {
 
 /**
  * 2nd guard: every endpoint requires a valid access token unless marked @Public().
+ * @OptionalAuth() endpoints are public but still recognise a valid token.
  * The user is re-loaded on each request, so suspension and role changes apply immediately.
  */
 @Injectable()
@@ -41,9 +42,14 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
-
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    if (isPublic) {
+      if (this.reflector.getAllAndOverride<boolean>(OPTIONAL_AUTH_KEY, [context.getHandler(), context.getClass()])) {
+        req.principal = await this.tryPrincipal(req);
+      }
+      return true;
+    }
+
     const [scheme, token] = (req.headers.authorization ?? '').split(' ');
     if (scheme !== 'Bearer' || !token) throw AppError.unauthenticated();
 
@@ -57,6 +63,15 @@ export class AuthGuard implements CanActivate {
 
     req.principal = principal;
     return true;
+  }
+
+  private async tryPrincipal(req: AuthenticatedRequest) {
+    const [scheme, token] = (req.headers.authorization ?? '').split(' ');
+    if (scheme !== 'Bearer' || !token) return undefined;
+    const payload = await this.tokens.verifyAccessToken(token);
+    if (!payload) return undefined;
+    const principal = await this.accessControl.loadPrincipal(payload.sub);
+    return principal?.status === 'ACTIVE' ? principal : undefined;
   }
 }
 
