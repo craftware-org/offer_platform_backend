@@ -82,6 +82,61 @@ export class OffersPublicService {
     );
   }
 
+  /** A publicly visible offer (live, paused or ended; verified business) by id; 404 otherwise. */
+  async getVisibleById(id: string): Promise<PublicOfferView> {
+    const [view] = await this.visibleByIds([id]);
+    if (!view) throw AppError.notFound('Offer');
+    return view;
+  }
+
+  /** Publicly visible offers among `ids`, in the given order (others, e.g. suspended, are skipped). */
+  async visibleByIds(ids: string[]): Promise<PublicOfferView[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select({ id: offers.id })
+      .from(offers)
+      .innerJoin(businesses, eq(businesses.id, offers.businessId))
+      .where(
+        and(inArray(offers.id, ids), inArray(offers.status, [...PUBLIC_STATUSES]), eq(businesses.status, 'VERIFIED')),
+      );
+    const visible = new Set(rows.map((r) => r.id));
+    const bundles = await this.reader.bundles(ids.filter((id) => visible.has(id)));
+    const now = new Date();
+    return bundles.map((b) => toPublicOfferView(b, now));
+  }
+
+  /** Live offers of the given businesses, newest approval first (the "shops you follow" feed). */
+  async liveForBusinesses(businessIds: string[], query: PageQuery): Promise<Page<PublicOfferView>> {
+    if (businessIds.length === 0) return new Page([], query, 0);
+    const now = new Date();
+    const where = and(
+      inArray(offers.businessId, businessIds),
+      eq(offers.status, 'ACTIVE'),
+      lte(offers.startsAt, now),
+      gt(offers.expiresAt, now),
+      eq(businesses.status, 'VERIFIED'),
+    );
+    const rows = await this.db
+      .select({ id: offers.id })
+      .from(offers)
+      .innerJoin(businesses, eq(businesses.id, offers.businessId))
+      .where(where)
+      .orderBy(desc(offers.approvedAt), desc(offers.id))
+      .limit(query.pageSize)
+      .offset(offsetOf(query));
+    const [total] = await this.db
+      .select({ value: count() })
+      .from(offers)
+      .innerJoin(businesses, eq(businesses.id, offers.businessId))
+      .where(where);
+    const bundles = await this.reader.bundles(rows.map((r) => r.id));
+    return new Page(
+      bundles.map((b) => toPublicOfferView(b, now)),
+      query,
+      total?.value ?? 0,
+    );
+  }
+
   /** Offer page. Expired offers stay reachable (shared links say "expired" instead of breaking). */
   async get(slug: string): Promise<PublicOfferView> {
     const [row] = await this.db

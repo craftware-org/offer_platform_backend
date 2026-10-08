@@ -138,6 +138,25 @@ See [offer-workflow.md](offer-workflow.md) for types, pricing and lifecycle, and
 | POST | `/auth/password/change` | user | Change password (current required); ends other sessions, returns tokens |
 | POST | `/auth/password/reset` | public | Forgot password: code + new password; ends every session, returns tokens |
 
+## Endpoints (Phase 5): engagement and reports
+
+All of these need a logged-in user. Only logged-in users' taps are counted (owner decision 2026-10-03).
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST / DELETE | `/me/saved-offers` (`{offerId}`), `/me/saved-offers/:offerId` | user | Save / unsave an offer (twice is harmless; ended offers can't be saved) |
+| GET | `/me/saved-offers?status=active|ended`, `/me/saved-offers/ids` | user | Saved offers (still on, or ended); ids for hearts |
+| POST / DELETE | `/me/follows` (`{businessId}`), `/me/follows/:businessId` | user | Follow / unfollow a verified business |
+| GET | `/me/follows`, `/me/follows/ids`, `/me/feed/following` | user | Followed businesses; live offers from them |
+| POST | `/events` | user | `{type, offerId | businessId}`: `OFFER_SHARED` (offer only), `CALL_CLICKED`, `WHATSAPP_CLICKED`, `WEBSITE_CLICKED`, `DIRECTIONS_CLICKED`. The same person and target count once per 30 minutes |
+| GET | `/me/businesses/:id/engagement` | owner/staff | Followers and totals (saves, shares, calls, WhatsApp, directions, website), in total and per offer |
+| POST | `/reports` | user | `{offerId, reason, note?}`; one open report per person per offer, max 20 per day |
+| GET | `/me/businesses/:id/warnings` | owner/staff | Warnings sent by admins (last 180 days) |
+| GET | `/admin/reports?status=OPEN|RESOLVED|DISMISSED`, `/admin/reports/:id` | `reports:moderate` | Queue (open: oldest first) and detail with action history |
+| PATCH | `/admin/reports/:id` | `reports:moderate` (+ `offers:moderate` / `businesses:manage`) | `{action, note}`: `DISMISS`, `WARN_BUSINESS` (note = message to the business), `SUSPEND_OFFER`, `SUSPEND_BUSINESS`. A note is required except to dismiss. Suspending closes every open report on that offer/business |
+
+Report reasons: `OFFER_UNAVAILABLE`, `WRONG_DISCOUNT`, `MISLEADING_INFORMATION`, `BUSINESS_CLOSED`, `WRONG_LOCATION`, `OFFENSIVE_CONTENT`, `SUSPICIOUS_ACTIVITY`, `OTHER`.
+
 ### `GET /discover/offers`
 
 | Parameter | Meaning |

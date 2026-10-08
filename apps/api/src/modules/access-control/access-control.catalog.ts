@@ -25,6 +25,7 @@ export const Permission = {
   SETTINGS_MANAGE: 'settings:manage',
   OFFERS_READ: 'offers:read',
   OFFERS_MODERATE: 'offers:moderate',
+  REPORTS_MODERATE: 'reports:moderate',
 } as const;
 export type Permission = (typeof Permission)[keyof typeof Permission];
 
@@ -41,6 +42,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'settings:manage': 'Change platform settings (e.g. verification requirements)',
   'offers:read': 'View all offers, including drafts and those under review',
   'offers:moderate': 'Approve, reject, request changes to, suspend and reactivate offers',
+  'reports:moderate': 'Review customer reports and act on them (dismiss, warn, suspend)',
 };
 
 const ADMIN_PERMISSIONS: Permission[] = [
@@ -54,6 +56,7 @@ const ADMIN_PERMISSIONS: Permission[] = [
   Permission.LOCATIONS_MANAGE,
   Permission.OFFERS_READ,
   Permission.OFFERS_MODERATE,
+  Permission.REPORTS_MODERATE,
 ];
 
 export const ROLE_DEFINITIONS: Record<

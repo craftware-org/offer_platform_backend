@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { AuthImage } from '@/components/auth-image';
+import { BusinessEngagementPanel } from '@/components/business-engagement';
 import { BusinessForm } from '@/components/business-form';
 import { ImageUpload } from '@/components/image-upload';
 import { RequireAuth } from '@/components/require-auth';
@@ -173,6 +174,8 @@ function Dashboard() {
           )}
         </section>
       )}
+
+      {business.status === 'VERIFIED' && <BusinessEngagementPanel businessId={business.id} />}
 
       <section className="card space-y-3">
         <h2 className="font-semibold">Logo and photos (shown publicly once verified)</h2>

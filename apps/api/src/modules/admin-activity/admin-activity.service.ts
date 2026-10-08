@@ -5,6 +5,7 @@ import { BusinessReader } from '../businesses/business-reader.js';
 import { CategoriesService } from '../categories/categories.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { OfferReader } from '../offers/offer-reader.js';
+import { ReportsService } from '../reports/reports.service.js';
 import { UsersService } from '../users/users.service.js';
 
 export interface ActivityEntry {
@@ -39,6 +40,7 @@ export class AdminActivityService {
     offers: OfferReader,
     categories: CategoriesService,
     locations: LocationsService,
+    reports: ReportsService,
   ) {
     this.labelers = {
       user: (ids) => this.users.labelsFor(ids),
@@ -47,6 +49,7 @@ export class AdminActivityService {
       category: (ids) => categories.labelsFor(ids),
       city: (ids) => locations.cityLabelsFor(ids),
       locality: (ids) => locations.localityLabelsFor(ids),
+      report: (ids) => reports.labelsFor(ids),
       // Settings are identified by their key, which is already readable.
       setting: async (ids) => new Map(ids.map((id) => [id, id])),
     };

@@ -12,7 +12,7 @@ All checks happen in the backend. Anything a frontend hides is only cosmetic.
 |---|---|
 | CUSTOMER | none (acts only on own data) |
 | BUSINESS_OWNER / BUSINESS_STAFF | none globally; access to a business comes from membership in `business_staff` |
-| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage`, `offers:read`, `offers:moderate` |
+| ADMIN | `users:read`, `users:manage-status`, `audit:read`, `businesses:read`, `businesses:verify`, `businesses:manage`, `categories:manage`, `locations:manage`, `offers:read`, `offers:moderate`, `reports:moderate` |
 | SUPER_ADMIN | all ADMIN permissions + `roles:assign`, `settings:manage` |
 
 ### Business-scoped access

@@ -228,6 +228,29 @@ export class BusinessesService {
     return toPublicView(await this.reader.bundle(row.id));
   }
 
+  /** A verified business by id (for follows); 404 when it is not publicly visible. */
+  async getPublicById(id: string): Promise<PublicBusinessView> {
+    const [row] = await this.db
+      .select({ id: businesses.id })
+      .from(businesses)
+      .where(and(eq(businesses.id, id), eq(businesses.status, 'VERIFIED')));
+    if (!row) throw AppError.notFound('Business');
+    return toPublicView(await this.reader.bundle(row.id));
+  }
+
+  /** Verified businesses among `ids`, in the given order (others are skipped). */
+  async publicViewsByIds(ids: string[]): Promise<PublicBusinessView[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .select({ id: businesses.id })
+      .from(businesses)
+      .where(and(inArray(businesses.id, ids), eq(businesses.status, 'VERIFIED')));
+    const visible = new Set(rows.map((r) => r.id));
+    const views: PublicBusinessView[] = [];
+    for (const id of ids) if (visible.has(id)) views.push(toPublicView(await this.reader.bundle(id)));
+    return views;
+  }
+
   async listPublic(query: PublicBusinessQuery): Promise<Page<PublicBusinessView>> {
     const filters = [eq(businesses.status, 'VERIFIED'), eq(businessLocations.isPrimary, true)];
     if (query.city) {

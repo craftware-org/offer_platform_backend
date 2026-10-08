@@ -26,7 +26,7 @@ import { OffersService } from './offers.service.js';
     OffersPublicService,
     ImageProcessor,
   ],
-  exports: [OfferReader],
+  exports: [OfferReader, OffersPublicService, OfferModerationService],
 })
 export class OffersModule {}
 

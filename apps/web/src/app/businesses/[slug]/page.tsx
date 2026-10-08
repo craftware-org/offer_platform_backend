@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { ContactLinks, FollowButton } from '@/components/engagement-buttons';
 import { OfferGrid } from '@/components/offer-card';
 import { apiUrl } from '@/lib/config';
 import { serverGet } from '@/lib/server-api';
@@ -34,8 +35,6 @@ export default async function BusinessPage({ params }: Props) {
   if (!b) notFound();
   const offers =
     (await serverGet<PublicOffer[]>(`/offers?business=${encodeURIComponent(slug)}&pageSize=50`)) ?? [];
-  const whatsapp = b.contact.whatsapp?.replace(/[^\d]/g, '');
-  const directions = `https://www.google.com/maps/dir/?api=1&destination=${b.coordinates.latitude},${b.coordinates.longitude}`;
 
   return (
     <div className="space-y-6">
@@ -52,23 +51,18 @@ export default async function BusinessPage({ params }: Props) {
             {b.category.name} · {b.address.line1}
             {b.address.locality && `, ${b.address.locality.name}`}, {b.address.city.name}
           </p>
-          <div className="flex flex-wrap gap-2 pt-2">
-            <a className="btn-primary" href={`tel:${b.contact.phone}`}>
-              Call
-            </a>
-            {whatsapp && (
-              <a className="btn-secondary" href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">
-                WhatsApp
-              </a>
-            )}
-            <a className="btn-secondary" href={directions} target="_blank" rel="noopener noreferrer">
-              Directions
-            </a>
-            {b.contact.website && (
-              <a className="btn-secondary" href={b.contact.website} target="_blank" rel="noopener noreferrer nofollow">
-                Website
-              </a>
-            )}
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            <FollowButton businessId={b.id} />
+            <ContactLinks
+              contact={{
+                phone: b.contact.phone,
+                whatsapp: b.contact.whatsapp,
+                website: b.contact.website,
+                latitude: b.coordinates.latitude,
+                longitude: b.coordinates.longitude,
+              }}
+              target={{ businessId: b.id }}
+            />
           </div>
         </div>
       </header>
