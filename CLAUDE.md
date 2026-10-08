@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-02.**
+> **Last updated: 2026-10-08.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -58,13 +58,13 @@ Other rules:
 | Web | Next.js website: customer pages, login, business portal, admin review (ADR-0014) | ✅ Done, live as a preview |
 | Auth+ | **Password login** after a one-time verification code; forgot password by code (ADR-0015) | ✅ Done 2026-10-01 |
 | A | **Admin screens**: users, categories, cities & areas, settings, activity log (in plain sentences) | ✅ Done 2026-10-02 |
-| 5 | Engagement: save/favourite, follow business, share tracking, contact-click tracking, report an offer | ⏳ Next (needs approval) |
-| 6 | Notifications: infrastructure, preferences, dispatch (push/email) | ⏳ |
+| 5 | **Engagement**: save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 |
+| 6 | Notifications: infrastructure, preferences, dispatch (push/email) | ⏳ Next (needs approval) |
 | 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ |
 | 8 | Security audit (findings fixed) | ⏳ |
 | 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
 
-**Tests (all must stay green):** API 180 unit + 131 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 26 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 180 unit + 141 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 27 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement
 
 ---
 
@@ -111,11 +111,12 @@ apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, Postgre
   src/common/             Errors, response envelope, pagination, auth decorators, validation pipe, phone, slug
   src/infrastructure/     database (Drizzle, PostGIS helpers, migrate), redis, storage, images (sharp), sms, email
   src/modules/            users, access-control, auth, audit, platform-settings, locations, categories,
-                          businesses, offers, discovery, meta, health, admin-activity (audit feed with names)
+                          businesses, offers, discovery, engagement (saves, follows, taps), reports,
+                          meta, health, admin-activity (audit feed with names)
                           (modules talk only via exported services)
   src/jobs/               BullMQ jobs (offer lifecycle)
   src/cli/                migrate, seed, grant-role, add-localities, export-openapi
-  database/migrations/    SQL migrations (0000–0007); some PostGIS/search SQL is hand-written
+  database/migrations/    SQL migrations (0000–0009); some PostGIS/search SQL is hand-written
   test/                   Integration tests (e2e-spec) + helpers (per-file database cloned from a template)
 apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind CSS 4
   src/app/                Routes (see §7)
@@ -215,7 +216,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 **Roles** ([docs/authorization.md](docs/authorization.md)):
 - Roles: CUSTOMER, BUSINESS_OWNER, BUSINESS_STAFF, ADMIN, SUPER_ADMIN.
-- Permissions: `users:read`, `users:manage-status`, `roles:assign`, `audit:read`, `businesses:read|verify|manage`, `offers:read|moderate`, `categories:manage`, `locations:manage`, `settings:manage`.
+- Permissions: `users:read`, `users:manage-status`, `roles:assign`, `audit:read`, `businesses:read|verify|manage`, `offers:read|moderate`, `reports:moderate`, `categories:manage`, `locations:manage`, `settings:manage`.
 - The backend always checks permissions; the website only hides buttons.
 
 **Business lifecycle** ([docs/business-workflow.md](docs/business-workflow.md)):
@@ -243,14 +244,25 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 - Ranking is rule-based, defined in `modules/discovery/ranking.ts`.
 - Customer coordinates are used per request only, never stored, and masked in logs.
 
+**Engagement and reports** (Phase 5, [docs/api.md](docs/api.md)):
+- **Logged-in customers** can save offers (♡), follow shops, share, and report an offer. Visitors are sent to log in.
+- **Saved page:** split into "Still on" and "Ended". Ended offers can't be saved.
+- **Following:** the home page shows "From shops you follow".
+- **Taps:** share, call, WhatsApp, directions and website are counted **only for logged-in users** (owner decision 2026-10-03). The same person tapping the same thing counts once per 30 minutes. No location or IP is stored.
+- **Reports:**
+  - the specification's 8 reasons;
+  - one open report per person per offer;
+  - admins can dismiss, warn the business (the message shows on its dashboard), suspend the offer, or suspend the business. Suspending closes all related open reports and reuses the normal suspension with a reason.
+- **Business dashboard:** followers plus totals and per-offer counts; charts come in Phase 7.
+
 **Website routes** (`apps/web/src/app`):
 
 | Area | Routes |
 |---|---|
-| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags) |
+| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following` |
 | Account | `/login`, `/account` |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
-| Admin | `/admin` (review queues), `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
+| Admin | `/admin` (review queues), `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
 Images:
 - **Public images** load directly from the API.
@@ -304,8 +316,8 @@ Images:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- Phase 5: engagement (saved offers, follow a business, share and contact-click tracking, report an offer).
-- Phases 5–9: see the detailed plan in **§13 Roadmap**. (Admin screens are done.)
+- **Phase 6 (notifications)** is next and needs approval; push needs a provider decision (FCM proposed).
+- Phases 6–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phase 5 are done.)
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -322,6 +334,8 @@ Images:
 - **No automated browser tests** for the website yet (add Playwright).
 - **Phone and email accounts can't be linked** into one account.
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
+- **Deleted accounts keep their saves and follows.** The rows point at the anonymized account and hold no personal data. Review in the Phase 8 privacy pass.
+- **Taps by visitors who are not logged in are not counted** (owner decision 2026-10-03), so business numbers understate real interest.
 
 ---
 
@@ -350,6 +364,11 @@ Images:
 - Git Bash rewrites `/v9/...` paths. Use `MSYS_NO_PATHCONV=1 vercel api ...`.
 - Empty values in `.env` count as unset.
 - Docker Desktop auto-updates can stop local containers: restart them.
+
+**Local runs (learned in Phase 5)**
+- If `node dist/main.js` fails with "Cannot find module …/config.module.js", the incremental build is stale: delete `apps/api/dist` and `apps/api/tsconfig.build.tsbuildinfo`, then rebuild.
+- Start the API **from `apps/api`** (it reads `apps/api/.env`), and the website with `pnpm --filter @offer-platform/web …`, so the two folders can't get mixed up.
+- Browsers may block the clipboard. Never make counting depend on it; the share button counts first, then copies or shows the link.
 
 **Server**
 - t3.micro needs the swap file to build the image.
@@ -404,7 +423,16 @@ Images:
 - Every admin task in §6 except server operations can be done in the browser.
 - `grant-role` and `add-localities` are needed only for bootstrapping.
 
-### Phase 5. Engagement
+### Phase 5. Engagement — ✅ Done 2026-10-08 (PR #12)
+
+> Built as planned, with the owner's choices (2026-10-03):
+> - reports from logged-in users only;
+> - all four admin actions;
+> - **only logged-in users' taps counted**;
+> - simple totals on the business dashboard.
+>
+> Tables use the specification's names: `saved_offers`, `business_followers`, `reports`, `report_actions`, `analytics_events`.
+
 
 **Goal:** customers keep and share offers, follow shops and report bad offers; businesses learn which offers interest people.
 
@@ -564,6 +592,35 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-08 · PR #12 · Phase 5: engagement and reports · Claude (AI agent), plan approved by the product owner 2026-10-03
+- **What changed:**
+  - **API:** new modules `engagement` (saved offers, follows, share/contact taps, business totals, followed-shops feed) and `reports` (customer reports; admin dismiss, warn, suspend offer, suspend business; business warnings).
+  - **Migration 0009:** `saved_offers`, `business_followers`, `analytics_events` (the full specification event list), `reports`, `report_actions`.
+  - New permission `reports:moderate` (Admin and Super admin). New audit actions `REPORT_DISMISSED`, `BUSINESS_WARNED`, `REPORT_RESOLVED`.
+  - The offers and businesses modules export small read methods (by id, by ids, live offers of followed shops) and their moderation services, so suspensions reuse the existing rules and audit.
+  - **Website:**
+    - ♡ on cards and offer pages; Share (phone share sheet / WhatsApp / copy link); counted contact links; Report form;
+    - Follow on shop pages; `/saved` and `/following`; a home section "From shops you follow";
+    - business dashboard totals and warnings; admin **Reports** queue and decision page;
+    - activity-log sentences for report decisions.
+- **Why:** Phase 5 of the roadmap; specification §23–27 and §30.
+- **How it was verified:**
+  - 10 new integration tests (saves, ended offers, follows/feed, tap counting and dedupe, report rules, all admin actions, warnings, permissions, activity labels) and 1 new web unit test.
+  - Browser run against a local API and database:
+    - a visitor's ♡ leads to login;
+    - sign-up, saving from a card, the Saved page;
+    - share, call tap, report;
+    - follow, the home "From shops you follow" section, the Following page;
+    - the admin queue and "warn the business";
+    - the owner dashboard showing the counts and the warning.
+  - Found and fixed one bug: the copy-link share wasn't counted when the browser blocked the clipboard.
+- **Deploy / migration / env notes:**
+  - Migration 0009 and the permission sync run automatically on deploy (migrate + seed).
+  - The API is deployed before merging (backward compatible); the website deploys on merge.
+- **Follow-ups:**
+  - Phase 6 needs approval.
+  - Deleted accounts keep their saves and follows (see §10).
 
 ### 2026-10-02 · PR #11 · information.md, the complete project reference · Claude (AI agent), requested by the product owner
 - **What changed:** new `information.md` covering:

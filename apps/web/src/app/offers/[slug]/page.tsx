@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ContactLinks, SaveButton, ShareButton } from '@/components/engagement-buttons';
 import { OfferPrice } from '@/components/offer-price';
+import { ReportOffer } from '@/components/report-offer';
 import { apiUrl } from '@/lib/config';
 import { serverGet } from '@/lib/server-api';
 import { endsIn, formatDateTime } from '@/lib/time';
@@ -28,8 +30,6 @@ export default async function OfferPage({ params }: Props) {
   const offer = await getOffer((await params).slug);
   if (!offer) notFound();
   const b = offer.business;
-  const directions = `https://www.google.com/maps/dir/?api=1&destination=${b.coordinates.latitude},${b.coordinates.longitude}`;
-  const whatsapp = b.whatsapp?.replace(/[^\d]/g, '');
 
   return (
     <article className="grid gap-6 md:grid-cols-2">
@@ -55,6 +55,10 @@ export default async function OfferPage({ params }: Props) {
         {offer.headline && <span className="badge bg-brand-600 text-sm text-white">{offer.headline}</span>}
         <h1 className="text-2xl font-bold">{offer.title}</h1>
         <OfferPrice type={offer.type} pricing={offer.pricing} />
+        <div className="flex flex-wrap gap-2">
+          {offer.availability !== 'EXPIRED' && <SaveButton offerId={offer.id} />}
+          <ShareButton offerId={offer.id} title={offer.headline ? `${offer.headline}: ${offer.title}` : offer.title} />
+        </div>
         {offer.description && <p className="whitespace-pre-line text-gray-700">{offer.description}</p>}
 
         <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -95,20 +99,18 @@ export default async function OfferPage({ params }: Props) {
             {b.address.line1}
             {b.address.locality && `, ${b.address.locality}`}, {b.address.city}
           </p>
-          <div className="flex flex-wrap gap-2">
-            <a className="btn-primary" href={`tel:${b.phone}`}>
-              Call
-            </a>
-            {whatsapp && (
-              <a className="btn-secondary" href={`https://wa.me/${whatsapp}`} target="_blank" rel="noopener noreferrer">
-                WhatsApp
-              </a>
-            )}
-            <a className="btn-secondary" href={directions} target="_blank" rel="noopener noreferrer">
-              Directions
-            </a>
-          </div>
+          <ContactLinks
+            contact={{
+              phone: b.phone,
+              whatsapp: b.whatsapp,
+              website: b.website,
+              latitude: b.coordinates.latitude,
+              longitude: b.coordinates.longitude,
+            }}
+            target={{ offerId: offer.id }}
+          />
         </div>
+        <ReportOffer offerId={offer.id} />
       </div>
     </article>
   );

@@ -9,6 +9,7 @@ import { BusinessesModule } from '../businesses/businesses.module.js';
 import { CategoriesModule } from '../categories/categories.module.js';
 import { LocationsModule } from '../locations/locations.module.js';
 import { OffersModule } from '../offers/offers.module.js';
+import { ReportsModule } from '../reports/reports.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AdminActivityService } from './admin-activity.service.js';
 
@@ -37,7 +38,7 @@ export class AdminActivityController {
 
 /** Read-only admin views that combine several modules through their exported services (ADR-0002). */
 @Module({
-  imports: [AuditModule, UsersModule, BusinessesModule, OffersModule, CategoriesModule, LocationsModule],
+  imports: [AuditModule, UsersModule, BusinessesModule, OffersModule, CategoriesModule, LocationsModule, ReportsModule],
   controllers: [AdminActivityController],
   providers: [AdminActivityService],
 })

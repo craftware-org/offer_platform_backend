@@ -20,6 +20,7 @@ const NOUN: Record<string, string> = {
   city: 'city',
   locality: 'area',
   setting: 'setting',
+  report: 'report on',
 };
 
 /** "verb {item}" templates; {item} becomes e.g. business “Shoe House”. */
@@ -63,6 +64,9 @@ const TEMPLATES: Record<string, string> = {
   OFFER_CHANGES_REQUESTED: 'asked for changes to {item}',
   OFFER_SUSPENDED: 'suspended {item}',
   OFFER_REACTIVATED: 'reactivated {item}',
+  REPORT_DISMISSED: 'dismissed {item}',
+  REPORT_RESOLVED: 'acted on {item}',
+  BUSINESS_WARNED: 'warned {item}',
 };
 
 const field = (value: unknown, key: string): string | null => {
@@ -90,7 +94,8 @@ export function describeActivity(e: ActivityEntry): string {
   const who = e.actor?.name ?? 'System';
   const noun = NOUN[e.entityType] ?? e.entityType;
   const label = e.entityType === 'setting' && e.entityLabel ? (SETTING_NAMES[e.entityLabel] ?? e.entityLabel) : e.entityLabel;
-  const item = label ? `${noun} “${label}”` : `a ${noun}`;
+  // Without a name, 'report on' would dangle: use the bare noun.
+  const item = label ? `${noun} “${label}”` : `a ${e.entityType === 'report' ? 'report' : noun}`;
   const role = ROLE_NAMES[field(e.newValue, 'role') ?? ''] ?? field(e.newValue, 'role') ?? 'a';
   const template = TEMPLATES[e.action];
   const what = template
@@ -110,4 +115,5 @@ export const ACTIVITY_TYPES: [string, string][] = [
   ['city', 'Cities'],
   ['locality', 'Areas'],
   ['setting', 'Settings'],
+  ['report', 'Reports'],
 ];

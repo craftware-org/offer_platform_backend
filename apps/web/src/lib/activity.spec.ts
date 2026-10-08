@@ -47,6 +47,20 @@ describe('describeActivity', () => {
     );
   });
 
+  it('describes report decisions (Phase 5)', () => {
+    expect(describeActivity(entry({ action: 'REPORT_DISMISSED', entityType: 'report', entityLabel: 'Engage sale' }))).toBe(
+      'Ravi dismissed report on “Engage sale”',
+    );
+    expect(
+      describeActivity(
+        entry({ action: 'BUSINESS_WARNED', newValue: { action: 'WARN_BUSINESS', reason: 'Show the real price' } }),
+      ),
+    ).toBe('Ravi warned business “Shoe House”: “Show the real price”');
+    expect(describeActivity(entry({ action: 'REPORT_RESOLVED', entityType: 'report', entityLabel: null }))).toBe(
+      'Ravi acted on a report',
+    );
+  });
+
   it('names settings in plain words', () => {
     expect(
       describeActivity(entry({ action: 'SYSTEM_SETTING_CHANGED', entityType: 'setting', entityLabel: 'offers.limits' })),

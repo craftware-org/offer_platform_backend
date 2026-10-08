@@ -16,6 +16,16 @@ export function Header() {
           Search
         </Link>
         <div className="ml-auto flex items-center gap-4">
+          {user && (
+            <>
+              <Link href="/saved" className="text-gray-700 hover:text-brand-600">
+                ♥ Saved
+              </Link>
+              <Link href="/following" className="text-gray-700 hover:text-brand-600">
+                Following
+              </Link>
+            </>
+          )}
           <Link href="/business" className="text-gray-700 hover:text-brand-600">
             For businesses
           </Link>

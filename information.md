@@ -9,7 +9,7 @@
 > - This file is the *reference*: what the product is and how it is built.
 > - Deeper technical detail: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/](docs/), [docs/adr/](docs/adr/README.md).
 >
-> **Last updated:** 2026-10-02. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
+> **Last updated:** 2026-10-08. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
 
 ---
 
@@ -90,6 +90,7 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-03 | **Phase 5 (engagement) approved.** Only logged-in users can report; admins can dismiss, warn the business, suspend the offer or suspend the business; **only logged-in users' taps are counted**; businesses see simple totals now. |
 | 2026-10-02 | Admin screens approved and built. The activity log is shown as plain sentences. |
 | 2026-10-01 | **Passwords added.** The email or phone is verified once with a code, then the user logs in with a password, and "forgot password" uses a code. This applies to phone and email accounts. Rules: 8+ characters, very common passwords refused. |
 | 2026-10-01 | Keep `CLAUDE.md` always current. Every change must be recorded there (mandatory rule). |
@@ -343,6 +344,30 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
   Verification is not a factor because only verified businesses are ever shown. Engagement and customer interests will be added once Phases 5/7 produce that data. All of this lives in one file (`ranking.ts`) so it can be tuned or replaced by an ML model later.
 - **Privacy:** customer coordinates are used **only for that request**; they are never stored and are masked in logs.
 
+### `engagement` (Phase 5)
+- **Saved offers** (`saved_offers`):
+  - ♡ on cards and offer pages; saving twice is harmless;
+  - the Saved page is split into "still on" and "ended"; ended offers can't be saved.
+- **Follows** (`business_followers`): follow a verified shop; its live offers appear in the home section "From shops you follow" (`GET /me/feed/following`).
+- **Taps** (`analytics_events`):
+  - share, call, WhatsApp, directions and website taps on offer and shop pages;
+  - counted **only for logged-in users** (owner decision);
+  - the same person and target count once per 30 minutes; at most 300 events per person per hour;
+  - saves and follows are also recorded as events for Phase 7;
+  - no location, IP or device data is stored.
+- **Business dashboard:** followers, plus totals and per-offer counts of saves, shares, calls, WhatsApp, directions and website (`GET /me/businesses/:id/engagement`).
+- **Module boundaries:** everything goes through exported services of the offers and businesses modules (ADR-0002).
+
+### `reports` (Phase 5)
+- **Who can report:** logged-in customers report an offer with one of the specification's 8 reasons (offer unavailable, wrong discount, misleading information, business closed, wrong location, offensive content, suspicious activity, other) and an optional note.
+- **Limits:** one open report per person per offer; 20 reports per person per day.
+- **Admin queue:** permission `reports:moderate`; oldest first; shows how many people reported the same offer.
+- **Admin decisions:**
+  - **dismiss**;
+  - **warn the business**: the message appears on its dashboard for 180 days;
+  - **suspend the offer** or **suspend the business**: reuses the normal suspension with a reason, and closes every related open report.
+- **Audit:** every decision is recorded in `report_actions` and the audit log, and appears in the activity log as a sentence.
+
 ### `meta` and `health`
 - `GET /meta` tells apps the brand name, whether this is a preview, which login methods deliver codes, the radius options and the feature flags.
 - `GET /health` and `GET /health/ready` check the database and Valkey.
@@ -378,10 +403,12 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | categories | `categories` (two levels via `parent_id`) |
 | businesses | `businesses`, `business_locations` (PostGIS point), `business_images`, `business_staff` |
 | offers | `offers` (search vector + trigram index), `offer_images`, `offer_price_history` |
+| engagement | `saved_offers`, `business_followers`, `analytics_events` |
+| reports | `reports`, `report_actions` |
 
 **Planned in the specification, not built yet:**
-- Phase 5: `saved_offers`, `business_followers`, `reports`, `report_actions`.
-- Phases 6–7: `notifications`, `notification_preferences`, `analytics_events`.
+- Phase 6: `notifications`, `notification_preferences`.
+- Phase 7: daily aggregate tables built from `analytics_events`.
 - Future: `redemptions`, `reviews`, `rewards`, `referrals`, `campaigns`, `sponsored_listings`, `plans`, `subscriptions`, `payments` (all behind feature flags).
 
 **Conventions:**
@@ -420,7 +447,7 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 
 ### The MVP success scenario (from the specification)
 *Business registers → creates profile → admin verifies → creates and submits offer → admin approves → offer becomes active → customer registers → selects location → searches Fashion → finds the nearby offer → views offer → views business → saves → shares → contacts → gets directions.*
-- **Working today:** every step except **save** and the share **tracking**, which are Phase 5. Sharing a link already works: each offer has its own page, with link previews.
+- **Working today:** every step, including save, share and contact (since Phase 5, 2026-10-08).
 
 ---
 
@@ -477,8 +504,8 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | Web | Website for customers, businesses and admins | ✅ Done 2026-10-01, live as a preview | — |
 | Auth+ | Password login, forgot password | ✅ Done 2026-10-01 | — |
 | A | Admin screens: users, categories, cities & areas, settings, activity log | ✅ Done 2026-10-02 | — |
-| 5 | **Engagement:** save offers, follow businesses, share tracking, call/WhatsApp/directions tracking, report an offer + admin report queue | ⏳ Next, **needs approval** | Nothing external |
-| 6 | **Notifications:** inbox, email, push; events (offer approved/rejected, business verified, followed shop's new offer, saved offer ending); preferences, quiet hours | ⏳ | **Push provider decision** (FCM proposed); Phase 5 for follows/saves |
+| 5 | **Engagement:** save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 | — |
+| 6 | **Notifications:** inbox, email, push; events (offer approved/rejected, business verified, followed shop's new offer, saved offer ending); preferences, quiet hours | ⏳ Next, **needs approval** | **Push provider decision** (FCM proposed); Phase 5 for follows/saves |
 | 7 | **Analytics:** event tracking; business dashboard (views, saves, shares, taps); admin dashboard (users, businesses, offers, engagement, categories, locations) | ⏳ | Phase 5 events; a charting library choice |
 | 8 | **Security audit:** OWASP ASVS L2 review, permission tests per endpoint, dependency audit, secret rotation, upload review, backup restore drill, DPDP review | ⏳ | — |
 | 9 | **Production readiness:** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
@@ -505,7 +532,8 @@ Legend:
 | Customer profile: name, phone, email | ✅ |
 | Customer profile: photo, interests, notification preferences | ⏳ 6 |
 | Home: search, location, categories, near you, new, ending soon, recommended | ✅ |
-| Home: trending, followed businesses | ⏳ 5/7 |
+| Home: followed businesses | ✅ |
+| Home: trending | ⏳ 7 |
 | Database-driven categories with admin create/edit/disable/reorder | ✅ |
 | Structured search (examples in the spec), PostGIS near me, filters | ✅ |
 | Location: GPS or manual city; radius; no tracking | ✅ (choosing an area and a map location: 🟡 search by area works; a map picker needs the maps vendor) |
@@ -515,14 +543,15 @@ Legend:
 | Business verification (configurable requirements) | ✅ (photos instead of documents, owner's choice) |
 | Business statuses and "Verified ✓" badge assigned only by admins | ✅ |
 | Business dashboard: status, offers by status | ✅ |
-| Business dashboard: views, saves, shares | ⏳ 7 |
+| Business dashboard: saves, shares, taps, followers (totals) | ✅ (views and charts ⏳ 7) |
 | Admin: users, businesses, offers, categories, settings, activity log | ✅ |
-| Admin: reports, analytics, notification configuration | ⏳ 5/7/6 |
+| Admin: reports | ✅ |
+| Admin: analytics, notification configuration | ⏳ 7/6 |
 | Moderation: automated checks, approve/reject/request changes, reason shown to the business | ✅ |
-| Saved offers, follow businesses | ⏳ 5 |
-| Sharing: offer page links with OpenGraph previews | ✅ (share tracking ⏳ 5) |
-| Contact business: call, WhatsApp, website, directions | ✅ (tap tracking ⏳ 5) |
-| Report an offer + report actions | ⏳ 5 |
+| Saved offers, follow businesses | ✅ |
+| Sharing: offer page links with OpenGraph previews, share counting | ✅ |
+| Contact business: call, WhatsApp, website, directions, tap counting | ✅ (logged-in users only) |
+| Report an offer + report actions | ✅ |
 | Notifications and preferences | ⏳ 6 |
 | Analytics events and dashboards | ⏳ 7 |
 | QR redemption | ➖ V2 (flag) |
@@ -565,14 +594,15 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 180 unit + 131 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
-- Website: 26 unit tests.
+- API: 180 unit + 141 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- Website: 27 unit tests.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
 **Browser runs (by hand, against a local API and database):**
 - the full MVP flow (2026-10-01);
 - password login (2026-10-01);
-- all admin screens (2026-10-02).
+- all admin screens (2026-10-02);
+- Phase 5 engagement and reports (2026-10-08).
 
 **A change is done only when:**
 - the tests pass, including integration tests against a real database, and CI is green;
@@ -595,7 +625,7 @@ Legend:
 4. **Push notification provider** (FCM proposed), for Phase 6.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget**, for Phase 9.
-7. **Approval of Phase 5** (engagement), the next phase.
+7. **Approval of Phase 6** (notifications), the next phase.
 
 ---
 

@@ -3,6 +3,7 @@ import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 import { Header } from '@/components/header';
 import { AuthProvider } from '@/lib/auth';
+import { EngagementProvider } from '@/lib/engagement';
 import { getAppMeta } from '@/lib/server-api';
 import './globals.css';
 
@@ -25,6 +26,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en">
       <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
         <AuthProvider meta={meta}>
+          <EngagementProvider>
           <Header />
           {meta.preview && (
             <div className="bg-amber-100 px-4 py-1 text-center text-xs text-amber-900">
@@ -35,6 +37,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <footer className="mx-auto max-w-6xl px-4 py-8 text-xs text-gray-500">
             © {meta.appName}. Offers are provided by the businesses listed.
           </footer>
+          </EngagementProvider>
         </AuthProvider>
       </body>
     </html>

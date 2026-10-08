@@ -4,13 +4,25 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LocationBar } from '@/components/location-bar';
 import { OfferGrid } from '@/components/offer-card';
-import { api, errorMessage } from '@/lib/api';
+import { api, apiPage, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useCustomerLocation } from '@/lib/location';
 import type { HomeSections } from '@/lib/types';
 
 export default function HomePage() {
-  const { meta } = useAuth();
+  const { meta, user } = useAuth();
+  const [followed, setFollowed] = useState<HomeSections['nearby']>([]);
+
+  // "From shops you follow" (spec §6 homepage): only for logged-in users who follow someone.
+  useEffect(() => {
+    if (!user) {
+      setFollowed([]);
+      return;
+    }
+    apiPage<HomeSections['nearby'][number]>('/me/feed/following', { query: { pageSize: 8 } })
+      .then((r) => setFollowed(r.items))
+      .catch(() => setFollowed([]));
+  }, [user]);
   const router = useRouter();
   const loc = useCustomerLocation(meta.discovery.defaultRadiusKm);
   const [sections, setSections] = useState<HomeSections | null>(null);
@@ -62,6 +74,7 @@ export default function HomePage() {
           {loc.location?.kind === 'gps' && (
             <Section title="Near you" offers={sections.nearby} empty="No offers within this distance yet. Try a larger radius." />
           )}
+          {followed.length > 0 && <Section title="From shops you follow" offers={followed} />}
           <Section title="Recommended" offers={sections.recommended} />
           <Section title="New offers" offers={sections.newOffers} />
           <Section title="Ending soon" offers={sections.endingSoon} />

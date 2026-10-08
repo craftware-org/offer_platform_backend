@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { apiUrl } from '@/lib/config';
 import { endsIn } from '@/lib/time';
 import type { DiscoveredOffer, PublicOffer } from '@/lib/types';
+import { SaveButton } from './engagement-buttons';
 import { OfferPrice } from './offer-price';
 
 export function OfferCard({ offer }: { offer: PublicOffer | DiscoveredOffer }) {
@@ -23,6 +24,11 @@ export function OfferCard({ offer }: { offer: PublicOffer | DiscoveredOffer }) {
         )}
         {offer.headline && (
           <span className="badge absolute top-2 left-2 bg-brand-600 text-white">{offer.headline}</span>
+        )}
+        {offer.availability !== 'EXPIRED' && (
+          <span className="absolute top-2 right-2">
+            <SaveButton offerId={offer.id} compact />
+          </span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1 px-4 pb-4">
