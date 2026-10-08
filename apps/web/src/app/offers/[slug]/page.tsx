@@ -8,6 +8,7 @@ import { apiUrl } from '@/lib/config';
 import { serverGet } from '@/lib/server-api';
 import { endsIn, formatDateTime } from '@/lib/time';
 import type { PublicOffer } from '@/lib/types';
+import { TrackView } from '@/components/track-view';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -33,6 +34,7 @@ export default async function OfferPage({ params }: Props) {
 
   return (
     <article className="grid gap-6 md:grid-cols-2">
+      <TrackView offerId={offer.id} />
       <div className="space-y-3">
         {offer.images.length > 0 ? (
           offer.images.map((img) => (

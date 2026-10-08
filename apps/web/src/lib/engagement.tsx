@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from './api';
 import { useAuth } from './auth';
+import { visitorId } from './visitor';
 
 export type TapEvent = 'OFFER_SHARED' | 'CALL_CLICKED' | 'WHATSAPP_CLICKED' | 'WEBSITE_CLICKED' | 'DIRECTIONS_CLICKED';
 
@@ -14,8 +15,8 @@ interface EngagementState {
   toggleSave(offerId: string): Promise<void>;
   toggleFollow(businessId: string): Promise<void>;
   /**
-   * Records a share/contact tap. Only logged-in users are counted (owner decision 2026-10-03), so
-   * for visitors this does nothing. Never blocks or breaks the link the person tapped.
+   * Records a share/contact tap, for everyone (owner decision 2026-10-08; visitors send a random
+   * visitor id). Never blocks or breaks the link the person tapped.
    */
   track(type: TapEvent, target: { offerId?: string; businessId?: string }): void;
 }
@@ -80,8 +81,7 @@ export function EngagementProvider({ children }: { children: ReactNode }) {
         }
       },
       track(type, target) {
-        if (!user) return;
-        void api('/events', { method: 'POST', body: { type, ...target } }).catch(() => {});
+        void api('/events', { method: 'POST', body: { type, ...target, visitorId: visitorId() } }).catch(() => {});
       },
     };
   }, [user, saved, following, toLogin]);

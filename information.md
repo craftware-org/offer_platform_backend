@@ -9,7 +9,7 @@
 > - This file is the *reference*: what the product is and how it is built.
 > - Deeper technical detail: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/](docs/), [docs/adr/](docs/adr/README.md).
 >
-> **Last updated:** 2026-10-08. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
+> **Last updated:** 2026-10-09. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
 
 ---
 
@@ -90,8 +90,9 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-08 | **Phase 7 (analytics) approved** (built 2026-10-09). Page views and taps are counted **for everyone**, logged in or not (this replaces the logged-in-only rule for taps), without storing who they are. **Searches are recorded** (words, city, result count; no user). **Raw events are kept 180 days**, daily totals forever. Businesses get a **weekly summary** on Mondays. |
 | 2026-10-08 | **Phase 6 (notifications) approved and built.** In-app inbox + email now; **push later, with the mobile apps** (FCM proposed). Shop and admin messages are emailed by default; **customers get the inbox only** unless they turn email on per type. No "nearby offer" alerts. Customer emails wait out quiet hours (22:00–08:00 IST). The first plan had a limit of 5 customer emails a day; the owner then chose **no limit**. |
-| 2026-10-03 | **Phase 5 (engagement) approved.** Only logged-in users can report; admins can dismiss, warn the business, suspend the offer or suspend the business; **only logged-in users' taps are counted**; businesses see simple totals now. |
+| 2026-10-03 | **Phase 5 (engagement) approved.** Only logged-in users can report; admins can dismiss, warn the business, suspend the offer or suspend the business; **only logged-in users' taps are counted** (changed to everyone on 2026-10-08, Phase 7); businesses see simple totals now. |
 | 2026-10-02 | Admin screens approved and built. The activity log is shown as plain sentences. |
 | 2026-10-01 | **Passwords added.** The email or phone is verified once with a code, then the user logs in with a password, and "forgot password" uses a code. This applies to phone and email accounts. Rules: 8+ characters, very common passwords refused. |
 | 2026-10-01 | Keep `CLAUDE.md` always current. Every change must be recorded there (mandatory rule). |
@@ -352,11 +353,11 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 - **Follows** (`business_followers`): follow a verified shop; its live offers appear in the home section "From shops you follow" (`GET /me/feed/following`).
 - **Taps** (`analytics_events`):
   - share, call, WhatsApp, directions and website taps on offer and shop pages;
-  - counted **only for logged-in users** (owner decision);
-  - the same person and target count once per 30 minutes; at most 300 events per person per hour;
-  - saves and follows are also recorded as events for Phase 7;
+  - counted for **everyone** since Phase 7 (logged-in users only in Phase 5); visitors send a random id their browser keeps;
+  - the same person/visitor and target count once per 30 minutes; at most 300 events per person per hour;
+  - saves and follows are also recorded as events, for analytics;
   - no location, IP or device data is stored.
-- **Business dashboard:** followers, plus totals and per-offer counts of saves, shares, calls, WhatsApp, directions and website (`GET /me/businesses/:id/engagement`).
+- **Business dashboard:** followers, plus totals and per-offer counts of saves, shares, calls, WhatsApp, directions and website (`GET /me/businesses/:id/engagement`). Since Phase 7 the website shows the analytics "Last 30 days" summary instead.
 - **Module boundaries:** everything goes through exported services of the offers and businesses modules (ADR-0002).
 
 ### `reports` (Phase 5)
@@ -379,6 +380,39 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 - **Email rules:** only to a **verified** address; customer emails wait out quiet hours (22:00–08:00 IST); **no daily limit**; each message is created once per person (a dedupe key).
 - **Email outbox:** emails wait in the same table; the worker sends due ones every minute (claimed with `FOR UPDATE SKIP LOCKED`, 3 tries 5 minutes apart, then marked FAILED). Every email has "Open", a signed one-click **"Stop emails like this"** link (no login needed) and "Manage notifications".
 - **Website:** 🔔 with an unread count in the header, an inbox page, settings on the Account page, and the unsubscribe page.
+
+### `analytics` (Phase 7, ADR-0017)
+- **What is counted:**
+  - views of offer pages and shop pages, sent by the browser after the page shows;
+  - the Phase 5 taps, saves and follows;
+  - typed searches.
+- **Counting rules (owner, 2026-10-08):**
+  - **everyone** is counted: logged-in users by their account, visitors by a random id their browser keeps;
+  - the same person or visitor doing the same thing within 30 minutes counts once;
+  - bots and scripts are skipped, and so are views by the shop's own staff and by admins;
+  - one IP address can add at most 1,000 anonymous events an hour (stops invented visitor ids inflating numbers);
+  - **views never store who viewed**; no IP, location or device anywhere.
+- **Searches** (`search_logs`):
+  - the words (lower case; numbers of 5+ digits and email addresses hidden as `#`), the city and how many offers matched; no user;
+  - counted once per visitor per 30 minutes; the first page only.
+- **Daily totals** (`analytics_daily`):
+  - one row per India-time day, shop, offer and event type;
+  - the worker rebuilds them at 00:30 IST and at start-up, catching up missed days;
+  - dashboards combine them with today's and yesterday's raw events, so they are never a day behind.
+- **Retention:** raw events and searches 180 days; daily totals forever.
+- **Business Performance page:**
+  - 7 / 30 / 90 days, each compared with the period before;
+  - a daily chart of views and taps;
+  - every offer with views, saves, shares, contact taps and taps per 100 views;
+  - the best offer.
+- **Admin Insights** (permission `analytics:read`):
+  - review queues and how long the oldest item has waited;
+  - visits and taps;
+  - sign-ups, logins and active users;
+  - live offers by city and category; the most viewed offers and shops;
+  - top searches, and searches that found nothing (demand no shop covers yet).
+- **Weekly summary:** Mondays 09:00 IST, last week's numbers and best offer to each verified shop with activity or a live offer (notifications inbox + email).
+- **Design:** a read-only reporting module: it reads other modules' tables for totals and writes only its own. Charts are drawn with plain SVG/CSS, without a chart library.
 
 ### `meta` and `health`
 - `GET /meta` tells apps the brand name, whether this is a preview, which login methods deliver codes, the radius options and the feature flags.
@@ -418,9 +452,9 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | engagement | `saved_offers`, `business_followers`, `analytics_events` |
 | reports | `reports`, `report_actions` |
 | notifications | `notifications` (inbox + email outbox), `notification_preferences` |
+| analytics | `analytics_daily` (daily totals), `search_logs` |
 
 **Planned in the specification, not built yet:**
-- Phase 7: daily aggregate tables built from `analytics_events`.
 - Future: `redemptions`, `reviews`, `rewards`, `referrals`, `campaigns`, `sponsored_listings`, `plans`, `subscriptions`, `payments` (all behind feature flags).
 
 **Conventions:**
@@ -516,10 +550,10 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | Web | Website for customers, businesses and admins | ✅ Done 2026-10-01, live as a preview | — |
 | Auth+ | Password login, forgot password | ✅ Done 2026-10-01 | — |
 | A | Admin screens: users, categories, cities & areas, settings, activity log | ✅ Done 2026-10-02 | — |
-| 5 | **Engagement:** save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 | — |
+| 5 | **Engagement:** save offers, follow businesses, share and contact-tap counts (logged-in users; everyone since Phase 7), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 | — |
 | 6 | **Notifications:** 🔔 inbox + email; shop, customer and admin messages; per-type preferences; quiet hours; one-click unsubscribe | ✅ Done 2026-10-08 (push later with the mobile apps) | — |
-| 7 | **Analytics:** event tracking; business dashboard (views, saves, shares, taps); admin dashboard (users, businesses, offers, engagement, categories, locations) | ⏳ Next, **needs approval** | Phase 5 events; a charting library choice |
-| 8 | **Security audit:** OWASP ASVS L2 review, permission tests per endpoint, dependency audit, secret rotation, upload review, backup restore drill, DPDP review | ⏳ | — |
+| 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
+| 8 | **Security audit:** OWASP ASVS L2 review, permission tests per endpoint, dependency audit, secret rotation, upload review, backup restore drill, DPDP review | ⏳ Next, **needs approval** | — |
 | 9 | **Production readiness:** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
 | Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
@@ -546,7 +580,7 @@ Legend:
 | Customer profile: photo, interests | ⏳ (not scheduled) |
 | Home: search, location, categories, near you, new, ending soon, recommended | ✅ |
 | Home: followed businesses | ✅ |
-| Home: trending | ⏳ 7 |
+| Home: trending | ⏳ not scheduled (the analytics data it needs now exists) |
 | Database-driven categories with admin create/edit/disable/reorder | ✅ |
 | Structured search (examples in the spec), PostGIS near me, filters | ✅ |
 | Location: GPS or manual city; radius; no tracking | ✅ (choosing an area and a map location: 🟡 search by area works; a map picker needs the maps vendor) |
@@ -556,22 +590,22 @@ Legend:
 | Business verification (configurable requirements) | ✅ (photos instead of documents, owner's choice) |
 | Business statuses and "Verified ✓" badge assigned only by admins | ✅ |
 | Business dashboard: status, offers by status | ✅ |
-| Business dashboard: saves, shares, taps, followers (totals) | ✅ (views and charts ⏳ 7) |
+| Business dashboard: views, saves, shares, taps, followers, charts, date ranges | ✅ |
 | Admin: users, businesses, offers, categories, settings, activity log | ✅ |
 | Admin: reports | ✅ |
-| Admin: analytics | ⏳ 7 |
+| Admin: analytics | ✅ |
 | Admin: notification configuration | 🟡 each admin sets their own; platform-wide switches not built |
 | Moderation: automated checks, approve/reject/request changes, reason shown to the business | ✅ |
 | Saved offers, follow businesses | ✅ |
 | Sharing: offer page links with OpenGraph previews, share counting | ✅ |
-| Contact business: call, WhatsApp, website, directions, tap counting | ✅ (logged-in users only) |
+| Contact business: call, WhatsApp, website, directions, tap counting | ✅ (everyone, deduped) |
 | Report an offer + report actions | ✅ |
 | Notifications and preferences | ✅ inbox + email (push ⏳ with the mobile apps) |
-| Analytics events and dashboards | ⏳ 7 |
+| Analytics events and dashboards | ✅ |
 | QR redemption | ➖ V2 (flag) |
 | Recommendations: rule-based ranking | ✅ (engagement signals added after Phase 5/7) |
 | Audit logging | ✅ |
-| Background jobs: offer start/expiry, notification emails, ending-soon, admin summary | ✅ (analytics aggregation ⏳ 7) |
+| Background jobs: offer start/expiry, notification emails, ending-soon, admin summary, analytics totals and clean-up, weekly business summary | ✅ |
 | SEO: server-rendered offer/business pages, titles, OpenGraph | ✅ |
 | SEO: sitemap, robots, structured data, `/category/:slug`, `/city/:slug` pages | ⏳ 9 (preview is set to no-index) |
 | Pagination, indexes, geo indexes, image optimization | ✅ |
@@ -608,8 +642,8 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 184 unit + 149 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
-- Website: 27 unit tests.
+- API: 190 unit + 155 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- Website: 30 unit tests.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
 **Browser runs (by hand, against a local API and database):**
@@ -617,7 +651,8 @@ Legend:
 - password login (2026-10-01);
 - all admin screens (2026-10-02);
 - Phase 5 engagement and reports (2026-10-08);
-- Phase 6 notifications: bell, inbox, settings, email and unsubscribe (2026-10-08).
+- Phase 6 notifications: bell, inbox, settings, email and unsubscribe (2026-10-08);
+- Phase 7 analytics: shop Performance page, admin Insights, view counting from a real browser (2026-10-09).
 
 **A change is done only when:**
 - the tests pass, including integration tests against a real database, and CI is green;
@@ -640,7 +675,7 @@ Legend:
 4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget**, for Phase 9.
-7. **Approval of Phase 7** (analytics), the next phase.
+7. **Approval of Phase 8** (security audit), the next phase.
 
 ---
 
@@ -656,7 +691,7 @@ Legend:
 | **Preview mode** | The team-only server setting where phone codes go to the server log; refused in production. |
 | **ADR** | Architecture Decision Record: one file per significant decision, in `docs/adr/`. |
 | **PostGIS** | PostgreSQL extension for geography; powers "near me". |
-| **Worker** | The background process that starts and ends offers on time and sends notification emails, ending-soon notices and the admin daily summary (later: analytics). |
+| **Worker** | The background process that starts and ends offers on time and sends notification emails, ending-soon notices, the admin daily summary and the weekly business summary, and builds the analytics daily totals. |
 | **Feature flag** | An on/off setting for a future feature (all monetization flags are off). |
 | **Audit log / activity log** | The permanent record of important actions; shown to admins as sentences. |
 | **sslip.io** | Free DNS that turns an IP address into a hostname, so the preview API can have HTTPS without a domain. |

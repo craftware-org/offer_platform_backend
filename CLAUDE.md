@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-08.**
+> **Last updated: 2026-10-09.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -58,13 +58,13 @@ Other rules:
 | Web | Next.js website: customer pages, login, business portal, admin review (ADR-0014) | ✅ Done, live as a preview |
 | Auth+ | **Password login** after a one-time verification code; forgot password by code (ADR-0015) | ✅ Done 2026-10-01 |
 | A | **Admin screens**: users, categories, cities & areas, settings, activity log (in plain sentences) | ✅ Done 2026-10-02 |
-| 5 | **Engagement**: save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 |
+| 5 | **Engagement**: save offers, follow businesses, share and contact-tap counts (logged-in users; everyone since Phase 7), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 |
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
-| 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ Next (needs approval) |
-| 8 | Security audit (findings fixed) | ⏳ |
+| 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
+| 8 | Security audit (findings fixed) | ⏳ Next (needs approval) |
 | 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
 
-**Tests (all must stay green):** API 184 unit + 149 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 27 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 190 unit + 155 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics
 
 ---
 
@@ -113,12 +113,14 @@ apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, Postgre
                           events (in-process domain events, ADR-0016)
   src/modules/            users, access-control, auth, audit, platform-settings, locations, categories,
                           businesses, offers, discovery, engagement (saves, follows, taps), reports,
-                          notifications (inbox, preferences, email outbox), meta, health,
+                          notifications (inbox, preferences, email outbox), analytics (read-only
+                          reporting: daily totals, searches, dashboards), meta, health,
                           admin-activity (audit feed with names)
                           (modules talk only via exported services)
-  src/jobs/               BullMQ jobs (offer lifecycle; notifications: email outbox, ending soon, admin summary)
+  src/jobs/               BullMQ jobs (offer lifecycle; notifications: email outbox, ending soon, admin summary;
+                          analytics: nightly totals + 180-day clean-up, weekly business summary)
   src/cli/                migrate, seed, grant-role, add-localities, export-openapi
-  database/migrations/    SQL migrations (0000–0010); some PostGIS/search SQL is hand-written
+  database/migrations/    SQL migrations (0000–0011); some PostGIS/search SQL is hand-written
   test/                   Integration tests (e2e-spec) + helpers (per-file database cloned from a template)
 apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind CSS 4
   src/app/                Routes (see §7)
@@ -193,6 +195,7 @@ It uploads the **committed** source (`git archive`, so no local files and no `.e
 | Status / logs | `docker compose ps` · `docker compose logs -f --tail 100 api` (also `worker`, `caddy`) |
 | Phone login code (preview) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
 | Notification jobs | `docker compose logs worker \| grep -i notification` (startup: "Notification jobs scheduled"; each run: "Notification emails processed" with sent/failed counts) |
+| Analytics jobs | `docker compose logs worker \| grep -i analytics` (startup: "Analytics jobs scheduled"). Daily totals are rebuilt at start-up and 00:30 IST; check with `docker compose exec postgres psql -U offer_platform -d offer_platform -c "select max(day) from analytics_daily"` |
 | Everyday admin work | **Use the website** (`/admin`): users and roles, categories, cities & areas, settings, activity log. The commands below are for bootstrapping and emergencies. |
 | Make someone admin | `docker compose exec api node dist/cli/grant-role.js --email <verified email> --role SUPER_ADMIN` (or `ADMIN`, or `--phone`) |
 | Add areas | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "A,B"` (idempotent) |
@@ -219,7 +222,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 **Roles** ([docs/authorization.md](docs/authorization.md)):
 - Roles: CUSTOMER, BUSINESS_OWNER, BUSINESS_STAFF, ADMIN, SUPER_ADMIN.
-- Permissions: `users:read`, `users:manage-status`, `roles:assign`, `audit:read`, `businesses:read|verify|manage`, `offers:read|moderate`, `reports:moderate`, `categories:manage`, `locations:manage`, `settings:manage`.
+- Permissions: `users:read`, `users:manage-status`, `roles:assign`, `audit:read`, `businesses:read|verify|manage`, `offers:read|moderate`, `reports:moderate`, `analytics:read`, `categories:manage`, `locations:manage`, `settings:manage`.
 - The backend always checks permissions; the website only hides buttons.
 
 **Business lifecycle** ([docs/business-workflow.md](docs/business-workflow.md)):
@@ -251,12 +254,25 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 - **Logged-in customers** can save offers (♡), follow shops, share, and report an offer. Visitors are sent to log in.
 - **Saved page:** split into "Still on" and "Ended". Ended offers can't be saved.
 - **Following:** the home page shows "From shops you follow".
-- **Taps:** share, call, WhatsApp, directions and website are counted **only for logged-in users** (owner decision 2026-10-03). The same person tapping the same thing counts once per 30 minutes. No location or IP is stored.
+- **Taps:** share, call, WhatsApp, directions and website are counted **for everyone** since Phase 7 (owner decision 2026-10-08; Phase 5 counted logged-in users only). The same person or visitor tapping the same thing counts once per 30 minutes. No location or IP is stored.
 - **Reports:**
   - the specification's 8 reasons;
   - one open report per person per offer;
   - admins can dismiss, warn the business (the message shows on its dashboard), suspend the offer, or suspend the business. Suspending closes all related open reports and reuses the normal suspension with a reason.
-- **Business dashboard:** followers plus totals and per-offer counts; charts come in Phase 7.
+- **Business dashboard:** a "Last 30 days" summary with a link to the Performance page (Phase 7).
+
+**Analytics** (Phase 7, ADR-0017, [docs/api.md](docs/api.md)):
+- **Who is counted:** everyone (owner, 2026-10-08). Logged-in users by their token; visitors by a random id the browser keeps (`op.visitor` in localStorage). Once per person/visitor per thing per 30 minutes.
+- **Not counted:** bots and scripts (by User-Agent, anonymous only), views by the shop's own staff, views by admins.
+- **Page views** are sent by the browser after the page shows (`components/track-view.tsx`) and **never store who viewed**.
+- **Searches:** typed words (first page only) with the city and the number of results; no user; digit runs of 5+ and email addresses become `#`.
+- **Spam guard:** anonymous events are capped at 1,000 per IP address per hour (hashed key, never stored); extra events are skipped quietly.
+- **Daily totals** (`analytics_daily`): rebuilt by the worker at start-up and at 00:30 IST (two days back plus any missed days). Dashboards use daily totals before yesterday and raw events for yesterday and today.
+- **Retention:** raw events and searches 180 days; daily totals forever.
+- **Business Performance page** (`/business/[id]/insights`, owner and staff): 7/30/90 days, change vs the previous period, daily chart, every offer with taps per 100 views, best offer.
+- **Admin Insights** (`/admin/insights`, `analytics:read`): review queues and their oldest item, visits, people (sign-ups, logins, active users), shops and offers (live by city and category), top offers and shops, top searches and **searches that found nothing**.
+- **Weekly summary:** Mondays 09:00 IST to every verified shop with activity or a live offer (notification type `BUSINESS_WEEKLY_SUMMARY`, inbox + email by default).
+- Charts are our own SVG/CSS (`components/charts.tsx`), no chart library.
 
 **Notifications** (Phase 6, ADR-0016, [docs/api.md](docs/api.md)):
 - **Who gets what:**
@@ -274,8 +290,8 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 |---|---|
 | Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe` |
 | Account | `/login`, `/account` (notification settings at `#notifications`) |
-| Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
-| Admin | `/admin` (review queues), `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
+| Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
+| Admin | `/admin` (review queues), `/admin/insights`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
 Images:
 - **Public images** load directly from the API.
@@ -329,8 +345,8 @@ Images:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 7 (analytics)** is next and needs approval.
-- Phases 7–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–6 are done.)
+- **Phase 8 (security audit)** is next and needs approval.
+- Phases 8–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–7 are done.)
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -348,7 +364,9 @@ Images:
 - **Phone and email accounts can't be linked** into one account.
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
 - **Deleted accounts keep their saves and follows.** The rows point at the anonymized account and hold no personal data. Review in the Phase 8 privacy pass.
-- **Taps by visitors who are not logged in are not counted** (owner decision 2026-10-03), so business numbers understate real interest.
+- **Visitor counts are approximate.** A visitor who clears browser storage or switches browser counts again; someone who blocks storage gets a new id per page load.
+- **`/me/businesses/:id/engagement` taps** are all-time counts of raw events, which now cover only 180 days. The website uses the insights endpoint; mobile apps should too.
+- **Search dedupe uses IP + User-Agent** (hashed, 30 minutes in Valkey). People sharing one mobile IP and the same phone model searching the same words in 30 minutes count once.
 - **Gmail sends about 500 emails a day at most.** With no daily limit per customer, a busy day could reach it; those emails fail after 3 tries (the inbox still works). Move to a real email provider in Phase 9.
 - **Notifications are never deleted yet.** Add a retention rule (e.g. 180 days) in the Phase 8 privacy pass.
 - **Domain events are in-process.** An event lost in a crash between commit and handler is not retried (ADR-0016); fine for the MVP, revisit if notifications become critical.
@@ -389,6 +407,9 @@ Images:
 - The local website runs on port 3001, but `apps/api/.env.example` allows only 5173: start the API with `CORS_ORIGINS=http://localhost:3001` (the environment beats the file) or add it to your `.env`.
 - Local notification emails are printed by the **worker** (`[DEV EMAIL]`); login codes are printed by the API.
 - Nest: a `@Post` that returns data answers 201 unless it has `@HttpCode(HttpStatus.OK)`.
+- Drizzle `sql` templates expand a JS array into a parameter list: write `id IN ${ids}` (guard empty arrays), not `= ANY(${ids}::uuid[])`.
+- Stopping a background `next dev` task on Windows can leave Next's server process running on port 3001 in a broken state (blank pages, "Jest worker" errors). Find it with `netstat -ano | grep :3001` and stop that process.
+- Analytics days before yesterday come from `analytics_daily`. On a fresh local database, start the **worker** once (it rolls up at start-up) or the dashboards show zeros for older days.
 
 **Server**
 - t3.micro needs the swap file to build the image.
@@ -402,7 +423,7 @@ Images:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0016).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0017).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -448,7 +469,7 @@ Images:
 > Built as planned, with the owner's choices (2026-10-03):
 > - reports from logged-in users only;
 > - all four admin actions;
-> - **only logged-in users' taps counted**;
+> - **only logged-in users' taps counted** (changed to everyone in Phase 7, 2026-10-08);
 > - simple totals on the business dashboard.
 >
 > Tables use the specification's names: `saved_offers`, `business_followers`, `reports`, `report_actions`, `analytics_events`.
@@ -522,7 +543,9 @@ Images:
 - Preferences are respected.
 - Failures are retried and logged.
 
-### Phase 7. Analytics
+### Phase 7. Analytics — ✅ Done 2026-10-09 (PR #14)
+
+> Built as approved on 2026-10-08, with the owner's choices: **views and taps counted for everyone** (anonymous, deduped, no identity stored), **searches recorded**, **raw events kept 180 days** (daily totals forever), **weekly summary to businesses**. Charts are our own SVG (ADR-0017). The plan below is kept for history; §7 describes what was built.
 
 **Goal:** businesses see how their offers perform; admins see the platform's health.
 
@@ -614,6 +637,56 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-09 · PR #14 · Phase 7: analytics · Claude (AI agent), plan approved by the product owner 2026-10-08
+- **What changed:**
+  - **ADR-0017:** who is counted and how; daily rollups; a read-only reporting module; hand-drawn charts.
+  - **API:**
+    - `@OptionalAuth()` (public, but a valid token still identifies the caller).
+    - `POST /events` is open to everyone: new `OFFER_VIEWED` / `BUSINESS_VIEWED`. Visitors send a random `visitorId`. There is a 30-minute dedupe per person/visitor. Bots and the shop's staff/admin views are skipped, and views store no user.
+    - `GET /discover/offers` records typed searches.
+    - New module `analytics`:
+      - `GET /me/businesses/:id/insights` and `GET /admin/insights` (new permission `analytics:read` for Admin and Super admin);
+      - nightly rollup into `analytics_daily`, also at worker start-up, catching up missed days;
+      - 180-day clean-up of raw events and `search_logs`;
+      - weekly business summary (new notification type `BUSINESS_WEEKLY_SUMMARY`).
+    - Worker queue `analytics`: nightly 00:30 IST, weekly Mondays 09:00 IST.
+    - **Migration 0011:** `analytics_daily`, `search_logs`, the new notification type.
+  - **Website:**
+    - views counted on offer and shop pages; taps counted for visitors too;
+    - new **Performance** page for shops (`/business/[id]/insights`); the shop dashboard shows "Last 30 days" instead of all-time totals;
+    - new admin **Insights** page;
+    - SVG/CSS charts.
+- **Why:** Phase 7 of the roadmap (spec §30). Owner decisions on 2026-10-08:
+  - count everyone (replacing the logged-in-only rule for taps);
+  - record searches;
+  - 180-day raw retention;
+  - weekly summary.
+- **How it was verified:**
+  - API 190 unit + 155 integration tests, web 30; lint, types and builds clean.
+  - 6 new unit tests: India-time days, search clean-up, bot detection. 6 new integration tests:
+    - counting rules: dedupe, bots, staff and admin views, anonymous without an id refused, no user on views;
+    - business insights with known numbers and permissions;
+    - rollup catch-up, idempotent re-run, totals surviving deleted raw events, previous period, 180-day purge;
+    - search logging: dedupe, page 2, bots, digit masking, no-results list;
+    - admin insights and permissions;
+    - weekly summary once per week.
+  - 3 new web unit tests.
+  - Browser run against a local API, worker and database:
+    - simulated visitors and searches; the shop dashboard summary; the Performance page at 30 and 7 days with the offer table and best offer;
+    - a logged-out visit counted from the real browser;
+    - the admin Insights page with every section; phone width on both pages.
+  - Found and fixed during the run:
+    - older days showed zero until the first nightly run, so the worker now also rolls up at start-up;
+    - "1 followers" now reads "1 follower".
+  - Security self-review of the new public endpoint: added a per-IP hourly cap for anonymous events and masking of email addresses in saved searches.
+- **Deploy / migration / env notes:**
+  - Migration 0011 and the new permission run on deploy (migrate + seed).
+  - **The worker must restart** with the new image; its log must show "Analytics jobs scheduled". It also builds daily totals for all existing events at start-up.
+  - No new environment variables.
+- **Follow-ups:**
+  - Phase 8 (security audit) needs approval. Include the new public `POST /events` (spam and rate limits) and the privacy review of analytics and search logs.
+  - Mobile apps should send a stable random visitor id the same way.
 
 ### 2026-10-08 · PR #13 · Phase 6: notifications · Claude (AI agent), plan approved by the product owner 2026-10-08
 - **What changed:**

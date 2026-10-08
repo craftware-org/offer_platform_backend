@@ -109,16 +109,17 @@ describe('Phase 5 engagement and reports — real Postgres + Valkey', () => {
     });
   });
 
-  describe('share and contact taps (logged-in users only)', () => {
+  describe('share and contact taps', () => {
     it('counts each person once per 30 minutes and shows totals to the owner only', async () => {
-      await ctx.http().post('/api/v1/events').send({ type: 'CALL_CLICKED', offerId: offer.id }).expect(401);
+      // Visitors are counted too since Phase 7, but must send their random visitor id.
+      await ctx.http().post('/api/v1/events').send({ type: 'CALL_CLICKED', offerId: offer.id }).expect(400);
       for (const u of [customer, customer, other]) {
         await ctx.http().post('/api/v1/events').set(as(u)).send({ type: 'CALL_CLICKED', offerId: offer.id }).expect(204);
       }
       await ctx.http().post('/api/v1/events').set(as(customer)).send({ type: 'OFFER_SHARED', offerId: offer.id }).expect(204);
       await ctx.http().post('/api/v1/events').set(as(customer)).send({ type: 'DIRECTIONS_CLICKED', businessId: business.id }).expect(204);
       await ctx.http().post('/api/v1/events').set(as(customer)).send({ type: 'OFFER_SHARED', businessId: business.id }).expect(400);
-      await ctx.http().post('/api/v1/events').set(as(customer)).send({ type: 'OFFER_VIEWED', offerId: offer.id }).expect(400);
+      await ctx.http().post('/api/v1/events').set(as(customer)).send({ type: 'OFFER_VIEWED', businessId: business.id }).expect(400);
 
       await ctx.http().post('/api/v1/me/follows').set(as(other)).send({ businessId: business.id }).expect(204);
       await ctx.http().post('/api/v1/me/saved-offers').set(as(other)).send({ offerId: offer.id }).expect(204);

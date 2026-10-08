@@ -348,6 +348,6 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | Web | Next.js website (`apps/web`): customer pages, login, business portal, admin review ([ADR-0014](docs/adr/0014-web-app-nextjs-on-vercel.md)) | ✅ Done 2026-10-01: browser end-to-end run of the full MVP flow; live at https://dodoom.vercel.app |
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | ✅ Done 2026-10-08 (180 unit + 141 integration tests) |
 | 6 | Notifications: infrastructure, preferences, dispatch ([ADR-0016](docs/adr/0016-notifications-domain-events-and-email-outbox.md): in-app inbox + email; push later with the mobile apps) | ✅ Done 2026-10-08 (184 unit + 149 integration tests) |
-| 7 | Analytics: ingestion, aggregates, business + admin analytics | |
+| 7 | Analytics: ingestion, aggregates, business + admin analytics ([ADR-0017](docs/adr/0017-analytics-counting-rollups-and-charts.md)) | ✅ Done 2026-10-09 (190 unit + 155 integration tests) |
 | 8 | Security audit | Findings fixed |
 | 9 | Production readiness: production Docker image, AWS infrastructure, staging deploy pipeline, backups, monitoring, deployment docs | MVP success scenario passes against a real DB |

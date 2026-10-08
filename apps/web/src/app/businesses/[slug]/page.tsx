@@ -5,6 +5,7 @@ import { OfferGrid } from '@/components/offer-card';
 import { apiUrl } from '@/lib/config';
 import { serverGet } from '@/lib/server-api';
 import type { Day, PublicBusiness, PublicOffer } from '@/lib/types';
+import { TrackView } from '@/components/track-view';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -38,6 +39,7 @@ export default async function BusinessPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
+      <TrackView businessId={b.id} />
       <header className="flex flex-wrap items-start gap-4">
         {b.logo && (
           // eslint-disable-next-line @next/next/no-img-element -- images come from the API (ADR-0014)

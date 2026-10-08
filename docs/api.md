@@ -140,7 +140,7 @@ See [offer-workflow.md](offer-workflow.md) for types, pricing and lifecycle, and
 
 ## Endpoints (Phase 5): engagement and reports
 
-All of these need a logged-in user. Only logged-in users' taps are counted (owner decision 2026-10-03).
+All of these need a logged-in user, except `POST /events`: since Phase 7 views and taps are counted for everyone (owner decision 2026-10-08, replacing the logged-in-only rule of 2026-10-03).
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
@@ -148,7 +148,7 @@ All of these need a logged-in user. Only logged-in users' taps are counted (owne
 | GET | `/me/saved-offers?status=active|ended`, `/me/saved-offers/ids` | user | Saved offers (still on, or ended); ids for hearts |
 | POST / DELETE | `/me/follows` (`{businessId}`), `/me/follows/:businessId` | user | Follow / unfollow a verified business |
 | GET | `/me/follows`, `/me/follows/ids`, `/me/feed/following` | user | Followed businesses; live offers from them |
-| POST | `/events` | user | `{type, offerId | businessId}`: `OFFER_SHARED` (offer only), `CALL_CLICKED`, `WHATSAPP_CLICKED`, `WEBSITE_CLICKED`, `DIRECTIONS_CLICKED`. The same person and target count once per 30 minutes |
+| POST | `/events` | optional | `{type, offerId | businessId, visitorId?}`: `OFFER_VIEWED` (offer only), `BUSINESS_VIEWED` (business only), `OFFER_SHARED` (offer only), `CALL_CLICKED`, `WHATSAPP_CLICKED`, `WEBSITE_CLICKED`, `DIRECTIONS_CLICKED`. Logged-in users are recognised by their token; anonymous callers must send a random `visitorId` (UUID). The same person/visitor and target count once per 30 minutes. Bots, views by the shop's staff or admins, and anonymous events beyond 1,000 per IP per hour are skipped silently (still 204). Views store no user |
 | GET | `/me/businesses/:id/engagement` | owner/staff | Followers and totals (saves, shares, calls, WhatsApp, directions, website), in total and per offer |
 | POST | `/reports` | user | `{offerId, reason, note?}`; one open report per person per offer, max 20 per day |
 | GET | `/me/businesses/:id/warnings` | owner/staff | Warnings sent by admins (last 180 days) |
@@ -173,6 +173,19 @@ Design: [ADR-0016](adr/0016-notifications-domain-events-and-email-outbox.md). No
 Types: `BUSINESS_VERIFIED`, `BUSINESS_REJECTED`, `BUSINESS_SUSPENDED`, `BUSINESS_REACTIVATED`, `BUSINESS_WARNED`, `OFFER_APPROVED`, `OFFER_REJECTED`, `OFFER_CHANGES_REQUESTED`, `OFFER_SUSPENDED`, `OFFER_ENDING_SOON` (shop); `FOLLOWED_SHOP_NEW_OFFER`, `SAVED_OFFER_ENDING` (customer); `ADMIN_DAILY_SUMMARY` (admin).
 
 Defaults: inbox always on; email on for shop and admin types, off for customer types (customers opt in per type). Emails go only to verified addresses. Customer emails wait out quiet hours (22:00–08:00 IST); there is no daily limit (owner, 2026-10-08).
+
+Phase 7 adds `BUSINESS_WEEKLY_SUMMARY` (shop): last week's numbers, Mondays 09:00 IST.
+
+## Endpoints (Phase 7): analytics
+
+Design: [ADR-0017](adr/0017-analytics-counting-rollups-and-charts.md). Days are India-time calendar days (`YYYY-MM-DD`); "the last N days" includes today, and `previous` is the N days before that.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/me/businesses/:id/insights?days=7\|30\|90` | owner/staff | Default 30. `totals` and `previous`: `{offerViews, shopViews, saves, shares, calls, whatsapp, website, directions, follows}`; `daily`: `[{day, views, taps}]` (every day, zero-filled; views = offer + shop views, taps = shares + contact taps); `offers`: current offers and any offer with activity, `{offerId, title, slug, status, views, saves, shares, contactTaps, tapsPer100Views}`; `bestOfferId` |
+| GET | `/admin/insights?days=7\|30\|90&city=<slug>` | `analytics:read` | `users` (total, active7, active30, signups and logins per day), `businesses` (by status, new per day), `offers` (live now, published per day, live by city and by category), `queues` (businesses, offers, reports: `{waiting, oldestSince}`), `engagement` (totals, previous, daily), `topOffers`, `topBusinesses` (10 each), `searches` (`total`, `top` with `avgResults`, `noResults`; 20 each). `city` filters only the searches |
+
+`GET /discover/offers` also records the search (typed words, first page only, once per visitor per 30 minutes, bots skipped) for the admin dashboard. Nothing changes in its response.
 
 ### `GET /discover/offers`
 
