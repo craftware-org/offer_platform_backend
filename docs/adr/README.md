@@ -19,5 +19,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0013](0013-preview-staging-on-single-ec2.md) | Team-only preview server on a single EC2 instance | Accepted |
 | [0014](0014-web-app-nextjs-on-vercel.md) | Web app: Next.js on Vercel, calling the API directly | Accepted |
 | [0015](0015-password-login.md) | Password login after a one-time verification code | Accepted |
+| [0016](0016-notifications-domain-events-and-email-outbox.md) | Notifications via in-process domain events and an email outbox | Accepted |
 
 Template: [`template.md`](template.md)

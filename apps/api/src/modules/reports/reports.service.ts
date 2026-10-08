@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { DomainEvents } from '../../infrastructure/events/domain-events.js';
 import { and, asc, count, desc, eq, gte, inArray } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
@@ -70,6 +71,7 @@ export class ReportsService {
     private readonly businessReader: BusinessReader,
     private readonly businessModeration: BusinessModerationService,
     private readonly users: UsersService,
+    private readonly events: DomainEvents,
   ) {}
 
   // ---- Customers ------------------------------------------------------------------------------
@@ -232,6 +234,9 @@ export class ReportsService {
         tx,
       );
     });
+    if (action === 'WARN_BUSINESS') {
+      await this.events.emit('business.warned', { businessId: report.businessId, offerId: report.offerId, message: reason! });
+    }
     return this.get(reportId);
   }
 

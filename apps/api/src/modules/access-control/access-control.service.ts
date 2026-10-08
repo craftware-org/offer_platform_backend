@@ -15,6 +15,16 @@ import { permissions, rolePermissions, roles, userRoles } from './access-control
 export class AccessControlService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
+  /** Users holding any of these roles (e.g. all admins, for the daily summary). */
+  async userIdsWithRoles(roleCodes: string[]): Promise<string[]> {
+    if (roleCodes.length === 0) return [];
+    const rows = await this.db
+      .selectDistinct({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(inArray(userRoles.roleCode, roleCodes));
+    return rows.map((r) => r.userId);
+  }
+
   /** Loads status, roles and effective permissions in one query. Null if the user does not exist. */
   async loadPrincipal(userId: string): Promise<Principal | null> {
     const rows = await this.db

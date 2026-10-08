@@ -90,6 +90,7 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-08 | **Phase 6 (notifications) approved and built.** In-app inbox + email now; **push later, with the mobile apps** (FCM proposed). Shop and admin messages are emailed by default; **customers get the inbox only** unless they turn email on per type. No "nearby offer" alerts. Customer emails wait out quiet hours (22:00–08:00 IST). The first plan had a limit of 5 customer emails a day; the owner then chose **no limit**. |
 | 2026-10-03 | **Phase 5 (engagement) approved.** Only logged-in users can report; admins can dismiss, warn the business, suspend the offer or suspend the business; **only logged-in users' taps are counted**; businesses see simple totals now. |
 | 2026-10-02 | Admin screens approved and built. The activity log is shown as plain sentences. |
 | 2026-10-01 | **Passwords added.** The email or phone is verified once with a code, then the user logs in with a password, and "forgot password" uses a code. This applies to phone and email accounts. Rules: 8+ characters, very common passwords refused. |
@@ -121,7 +122,7 @@ The product owner's original specification ("Craftfiz master specification", 62 
 | Login | Phone OTP preferred; email/Google/Apple possible | **Phone or email code**, then **password** (ADR-0006, ADR-0015) | SMS needs a vendor + TRAI DLT (pending). Email works now; passwords reduce friction |
 | Business verification | PAN, GSTIN, registration documents (configurable) | **No identity documents**: shop photo, optional owner photo, optional registration number; configurable by admins (ADR-0012) | Owner's choice: don't hold sensitive documents |
 | Object storage | S3-type storage | **Server disk** in preview; **S3** before launch | Simplicity for the team preview |
-| Notifications | Firebase Cloud Messaging | **Pending decision** (Phase 6) | Not needed yet |
+| Notifications | Firebase Cloud Messaging | **In-app inbox + email** now (ADR-0016); **push (FCM proposed) later with the mobile apps** | The website works without push; email already worked through Gmail |
 | Maps | Google Maps Platform | **Pending decision**; today businesses enter coordinates or tap "I am at the shop" | Avoid cost and lock-in until needed |
 | Hosting | (not specified) | **AWS Mumbai** for the API (ADR-0011, ADR-0013); **Vercel** for the website (ADR-0014) | Data close to users in India; free and fast for the website |
 | API style | `/api/v1/`, `{success, data}` envelope | **Same**, plus stable error codes and pagination `meta` | As specified |
@@ -368,6 +369,17 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
   - **suspend the offer** or **suspend the business**: reuses the normal suspension with a reason, and closes every related open report.
 - **Audit:** every decision is recorded in `report_actions` and the audit log, and appears in the activity log as a sentence.
 
+### `notifications` (Phase 6, ADR-0016)
+- **Messages (13 types):**
+  - to the shop: business verified / rejected / suspended / reactivated; a warning from an admin; offer approved / rejected / changes requested / suspended; offer ending within a day;
+  - to customers: a followed shop's offer goes live; a saved offer ends within a day;
+  - to admins: a daily summary at 09:00 IST (businesses and offers waiting for review, open reports), not sent when everything is zero.
+- **How messages are created:** the moderation and lifecycle code emits **domain events after the database commit** (`infrastructure/events`). The notifications module listens, looks up who should hear about it (owners and staff, followers, savers, admins) through other modules' exported services, and writes one row per person. A failure there is logged and never undoes the action. Worker scans create the "ending soon" and daily-summary messages.
+- **Channels and preferences:** every type has an inbox and an email switch per person. Defaults: inbox on; email on for shop and admin types, off for customer types. The Account page shows only the types that apply to that person.
+- **Email rules:** only to a **verified** address; customer emails wait out quiet hours (22:00–08:00 IST); **no daily limit**; each message is created once per person (a dedupe key).
+- **Email outbox:** emails wait in the same table; the worker sends due ones every minute (claimed with `FOR UPDATE SKIP LOCKED`, 3 tries 5 minutes apart, then marked FAILED). Every email has "Open", a signed one-click **"Stop emails like this"** link (no login needed) and "Manage notifications".
+- **Website:** 🔔 with an unread count in the header, an inbox page, settings on the Account page, and the unsubscribe page.
+
 ### `meta` and `health`
 - `GET /meta` tells apps the brand name, whether this is a preview, which login methods deliver codes, the radius options and the feature flags.
 - `GET /health` and `GET /health/ready` check the database and Valkey.
@@ -405,9 +417,9 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | offers | `offers` (search vector + trigram index), `offer_images`, `offer_price_history` |
 | engagement | `saved_offers`, `business_followers`, `analytics_events` |
 | reports | `reports`, `report_actions` |
+| notifications | `notifications` (inbox + email outbox), `notification_preferences` |
 
 **Planned in the specification, not built yet:**
-- Phase 6: `notifications`, `notification_preferences`.
 - Phase 7: daily aggregate tables built from `analytics_events`.
 - Future: `redemptions`, `reviews`, `rewards`, `referrals`, `campaigns`, `sponsored_listings`, `plans`, `subscriptions`, `payments` (all behind feature flags).
 
@@ -505,11 +517,11 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | Auth+ | Password login, forgot password | ✅ Done 2026-10-01 | — |
 | A | Admin screens: users, categories, cities & areas, settings, activity log | ✅ Done 2026-10-02 | — |
 | 5 | **Engagement:** save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 | — |
-| 6 | **Notifications:** inbox, email, push; events (offer approved/rejected, business verified, followed shop's new offer, saved offer ending); preferences, quiet hours | ⏳ Next, **needs approval** | **Push provider decision** (FCM proposed); Phase 5 for follows/saves |
-| 7 | **Analytics:** event tracking; business dashboard (views, saves, shares, taps); admin dashboard (users, businesses, offers, engagement, categories, locations) | ⏳ | Phase 5 events; a charting library choice |
+| 6 | **Notifications:** 🔔 inbox + email; shop, customer and admin messages; per-type preferences; quiet hours; one-click unsubscribe | ✅ Done 2026-10-08 (push later with the mobile apps) | — |
+| 7 | **Analytics:** event tracking; business dashboard (views, saves, shares, taps); admin dashboard (users, businesses, offers, engagement, categories, locations) | ⏳ Next, **needs approval** | Phase 5 events; a charting library choice |
 | 8 | **Security audit:** OWASP ASVS L2 review, permission tests per endpoint, dependency audit, secret rotation, upload review, backup restore drill, DPDP review | ⏳ | — |
 | 9 | **Production readiness:** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
-| Later | Mobile apps; phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
+| Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
 The detailed plan for each pending phase (screens, server work, "done when") is in [CLAUDE.md §13 Roadmap](CLAUDE.md).
@@ -530,7 +542,8 @@ Legend:
 | Market data not tied to Hubballi (country/state/city/area/lat/lng/radius) | ✅ |
 | Customer login (codes, email, password, reset, logout, delete account) | ✅ (phone codes need the SMS vendor) |
 | Customer profile: name, phone, email | ✅ |
-| Customer profile: photo, interests, notification preferences | ⏳ 6 |
+| Customer profile: notification preferences | ✅ |
+| Customer profile: photo, interests | ⏳ (not scheduled) |
 | Home: search, location, categories, near you, new, ending soon, recommended | ✅ |
 | Home: followed businesses | ✅ |
 | Home: trending | ⏳ 7 |
@@ -546,18 +559,19 @@ Legend:
 | Business dashboard: saves, shares, taps, followers (totals) | ✅ (views and charts ⏳ 7) |
 | Admin: users, businesses, offers, categories, settings, activity log | ✅ |
 | Admin: reports | ✅ |
-| Admin: analytics, notification configuration | ⏳ 7/6 |
+| Admin: analytics | ⏳ 7 |
+| Admin: notification configuration | 🟡 each admin sets their own; platform-wide switches not built |
 | Moderation: automated checks, approve/reject/request changes, reason shown to the business | ✅ |
 | Saved offers, follow businesses | ✅ |
 | Sharing: offer page links with OpenGraph previews, share counting | ✅ |
 | Contact business: call, WhatsApp, website, directions, tap counting | ✅ (logged-in users only) |
 | Report an offer + report actions | ✅ |
-| Notifications and preferences | ⏳ 6 |
+| Notifications and preferences | ✅ inbox + email (push ⏳ with the mobile apps) |
 | Analytics events and dashboards | ⏳ 7 |
 | QR redemption | ➖ V2 (flag) |
 | Recommendations: rule-based ranking | ✅ (engagement signals added after Phase 5/7) |
 | Audit logging | ✅ |
-| Background jobs: offer start/expiry | ✅ (notifications and analytics aggregation ⏳ 6/7) |
+| Background jobs: offer start/expiry, notification emails, ending-soon, admin summary | ✅ (analytics aggregation ⏳ 7) |
 | SEO: server-rendered offer/business pages, titles, OpenGraph | ✅ |
 | SEO: sitemap, robots, structured data, `/category/:slug`, `/city/:slug` pages | ⏳ 9 (preview is set to no-index) |
 | Pagination, indexes, geo indexes, image optimization | ✅ |
@@ -594,7 +608,7 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 180 unit + 141 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- API: 184 unit + 149 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
 - Website: 27 unit tests.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
@@ -602,7 +616,8 @@ Legend:
 - the full MVP flow (2026-10-01);
 - password login (2026-10-01);
 - all admin screens (2026-10-02);
-- Phase 5 engagement and reports (2026-10-08).
+- Phase 5 engagement and reports (2026-10-08);
+- Phase 6 notifications: bell, inbox, settings, email and unsubscribe (2026-10-08).
 
 **A change is done only when:**
 - the tests pass, including integration tests against a real database, and CI is green;
@@ -622,10 +637,10 @@ Legend:
 1. **SMS provider** + TRAI DLT registration, for real phone login and phone password reset.
 2. **Maps provider** (Google / Ola Maps / Mapbox), for a map picker and address search.
 3. **Final product name and domain.** Moving takes about 30 minutes of configuration: DNS, API settings, Vercel variable.
-4. **Push notification provider** (FCM proposed), for Phase 6.
+4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget**, for Phase 9.
-7. **Approval of Phase 6** (notifications), the next phase.
+7. **Approval of Phase 7** (analytics), the next phase.
 
 ---
 
@@ -641,7 +656,7 @@ Legend:
 | **Preview mode** | The team-only server setting where phone codes go to the server log; refused in production. |
 | **ADR** | Architecture Decision Record: one file per significant decision, in `docs/adr/`. |
 | **PostGIS** | PostgreSQL extension for geography; powers "near me". |
-| **Worker** | The background process that starts and ends offers on time (later: notifications, analytics). |
+| **Worker** | The background process that starts and ends offers on time and sends notification emails, ending-soon notices and the admin daily summary (later: analytics). |
 | **Feature flag** | An on/off setting for a future feature (all monetization flags are off). |
 | **Audit log / activity log** | The permanent record of important actions; shown to admins as sentences. |
 | **sslip.io** | Free DNS that turns an IP address into a hostname, so the preview API can have HTTPS without a domain. |

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { DomainEvents } from '../../infrastructure/events/domain-events.js';
 import { and, asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 import { AppError } from '../../common/errors/app-error.js';
 import { escapeLike } from '../../common/text/like.js';
@@ -41,6 +42,7 @@ export class BusinessModerationService {
     private readonly reader: BusinessReader,
     private readonly businessesService: BusinessesService,
     private readonly audit: AuditService,
+    private readonly events: DomainEvents,
   ) {}
 
   async list(query: AdminBusinessQuery): Promise<Page<AdminBusinessView>> {
@@ -96,6 +98,7 @@ export class BusinessModerationService {
     reason: string | undefined,
     actor: Actor,
   ): Promise<AdminBusinessView> {
+    let newStatus = '';
     await this.db.transaction(async (tx) => {
       const [business] = await tx
         .select()
@@ -108,6 +111,7 @@ export class BusinessModerationService {
       }
 
       const next = nextBusinessStatus(business.status, action, { wasVerified: business.verifiedAt !== null });
+      newStatus = next;
       const set: Partial<typeof businesses.$inferInsert> = {
         status: next,
         statusReason: action === 'REJECT' || action === 'SUSPEND' ? (reason ?? null) : null,
@@ -130,6 +134,8 @@ export class BusinessModerationService {
         tx,
       );
     });
+    // Announced after commit (ADR-0016).
+    await this.events.emit('business.status_changed', { businessId, action, status: newStatus, reason: reason ?? null });
     return this.get(businessId);
   }
 

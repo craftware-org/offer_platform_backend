@@ -59,12 +59,12 @@ Other rules:
 | Auth+ | **Password login** after a one-time verification code; forgot password by code (ADR-0015) | ✅ Done 2026-10-01 |
 | A | **Admin screens**: users, categories, cities & areas, settings, activity log (in plain sentences) | ✅ Done 2026-10-02 |
 | 5 | **Engagement**: save offers, follow businesses, share and contact-tap counts (logged-in users), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 |
-| 6 | Notifications: infrastructure, preferences, dispatch (push/email) | ⏳ Next (needs approval) |
-| 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ |
+| 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
+| 7 | Analytics: ingestion, aggregates, business + admin dashboards | ⏳ Next (needs approval) |
 | 8 | Security audit (findings fixed) | ⏳ |
 | 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
 
-**Tests (all must stay green):** API 180 unit + 141 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 27 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 184 unit + 149 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 27 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications
 
 ---
 
@@ -106,17 +106,19 @@ This is a **team-only preview**: data may be reset, and search engines are told 
 
 ```
 apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, PostgreSQL + PostGIS, Valkey/BullMQ
-  src/main.ts, worker.ts  Two processes: HTTP API and background worker (scheduled offer start/expiry)
+  src/main.ts, worker.ts  Two processes: HTTP API and background worker (offer start/expiry, notification jobs)
   src/config/             Env validation (Zod), logger (pino, masks coordinates/phones), .env loader
   src/common/             Errors, response envelope, pagination, auth decorators, validation pipe, phone, slug
-  src/infrastructure/     database (Drizzle, PostGIS helpers, migrate), redis, storage, images (sharp), sms, email
+  src/infrastructure/     database (Drizzle, PostGIS helpers, migrate), redis, storage, images (sharp), sms, email,
+                          events (in-process domain events, ADR-0016)
   src/modules/            users, access-control, auth, audit, platform-settings, locations, categories,
                           businesses, offers, discovery, engagement (saves, follows, taps), reports,
-                          meta, health, admin-activity (audit feed with names)
+                          notifications (inbox, preferences, email outbox), meta, health,
+                          admin-activity (audit feed with names)
                           (modules talk only via exported services)
-  src/jobs/               BullMQ jobs (offer lifecycle)
+  src/jobs/               BullMQ jobs (offer lifecycle; notifications: email outbox, ending soon, admin summary)
   src/cli/                migrate, seed, grant-role, add-localities, export-openapi
-  database/migrations/    SQL migrations (0000–0009); some PostGIS/search SQL is hand-written
+  database/migrations/    SQL migrations (0000–0010); some PostGIS/search SQL is hand-written
   test/                   Integration tests (e2e-spec) + helpers (per-file database cloned from a template)
 apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind CSS 4
   src/app/                Routes (see §7)
@@ -190,6 +192,7 @@ It uploads the **committed** source (`git archive`, so no local files and no `.e
 |---|---|
 | Status / logs | `docker compose ps` · `docker compose logs -f --tail 100 api` (also `worker`, `caddy`) |
 | Phone login code (preview) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
+| Notification jobs | `docker compose logs worker \| grep -i notification` (startup: "Notification jobs scheduled"; each run: "Notification emails processed" with sent/failed counts) |
 | Everyday admin work | **Use the website** (`/admin`): users and roles, categories, cities & areas, settings, activity log. The commands below are for bootstrapping and emergencies. |
 | Make someone admin | `docker compose exec api node dist/cli/grant-role.js --email <verified email> --role SUPER_ADMIN` (or `ADMIN`, or `--phone`) |
 | Add areas | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "A,B"` (idempotent) |
@@ -255,12 +258,22 @@ Full guide: [docs/deployment.md](docs/deployment.md).
   - admins can dismiss, warn the business (the message shows on its dashboard), suspend the offer, or suspend the business. Suspending closes all related open reports and reuses the normal suspension with a reason.
 - **Business dashboard:** followers plus totals and per-offer counts; charts come in Phase 7.
 
+**Notifications** (Phase 6, ADR-0016, [docs/api.md](docs/api.md)):
+- **Who gets what:**
+  - shop: business verified / rejected / suspended / reactivated, a warning from an admin, offer approved / rejected / changes requested / suspended, offer ending within a day;
+  - customer: a followed shop's offer goes live, a saved offer ends within a day;
+  - admins: a daily summary at 09:00 IST (businesses and offers waiting, open reports), skipped when everything is zero.
+- **Channels:** 🔔 inbox always; **email on by default for shop and admin messages, off for customers** (they opt in per type on the Account page). Push comes later with the mobile apps.
+- **Rules:** email only to a **verified** address; customer emails wait out **quiet hours 22:00–08:00 IST**; **no daily limit** (owner, 2026-10-08). Each message is sent once (a dedupe key per user).
+- **How it works:** moderation and lifecycle code emit domain events **after commit**; the notifications module listens and writes rows. A handler failure is logged and never breaks the action. Emails wait in the same table as an **outbox**; the worker sends them every minute (3 tries, 5 minutes apart, then FAILED).
+- Every email has a signed one-click **"Stop emails like this"** link (`/unsubscribe?token=…`, HMAC key derived from `OTP_HASH_SECRET`; no login needed).
+
 **Website routes** (`apps/web/src/app`):
 
 | Area | Routes |
 |---|---|
-| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following` |
-| Account | `/login`, `/account` |
+| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe` |
+| Account | `/login`, `/account` (notification settings at `#notifications`) |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
 | Admin | `/admin` (review queues), `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
@@ -312,12 +325,12 @@ Images:
    - DNS: `api.<domain>` → Elastic IP, website domain → Vercel;
    - API `.env`: `API_DOMAIN`, `APP_PUBLIC_URL`, `CORS_ORIGINS`, `APP_DISPLAY_NAME`;
    - Vercel: `NEXT_PUBLIC_API_URL`.
-4. **MVP launch date.** Push notifications vendor (FCM?) for Phase 6.
+4. **MVP launch date.** Push provider (FCM proposed) when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 6 (notifications)** is next and needs approval; push needs a provider decision (FCM proposed).
-- Phases 6–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phase 5 are done.)
+- **Phase 7 (analytics)** is next and needs approval.
+- Phases 7–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–6 are done.)
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -336,6 +349,9 @@ Images:
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
 - **Deleted accounts keep their saves and follows.** The rows point at the anonymized account and hold no personal data. Review in the Phase 8 privacy pass.
 - **Taps by visitors who are not logged in are not counted** (owner decision 2026-10-03), so business numbers understate real interest.
+- **Gmail sends about 500 emails a day at most.** With no daily limit per customer, a busy day could reach it; those emails fail after 3 tries (the inbox still works). Move to a real email provider in Phase 9.
+- **Notifications are never deleted yet.** Add a retention rule (e.g. 180 days) in the Phase 8 privacy pass.
+- **Domain events are in-process.** An event lost in a crash between commit and handler is not retried (ADR-0016); fine for the MVP, revisit if notifications become critical.
 
 ---
 
@@ -358,6 +374,7 @@ Images:
 - The CSP nonce only works with dynamic rendering, so the root layout calls `connection()`.
 - Tailwind 4: custom classes used with `@apply` must be declared with `@utility`.
 - oxlint: the React `set-state-in-effect` rule is off on purpose (data-loading effects).
+- The header has many links: keep its rows `flex-wrap` and check a 375 px width (it overflowed after Phase 5 until Phase 6 fixed it).
 
 **Windows and tools**
 - Mark shell scripts executable in git with `git update-index --chmod=+x`; Windows loses the bit and the server then refuses to run them.
@@ -369,6 +386,9 @@ Images:
 - If `node dist/main.js` fails with "Cannot find module …/config.module.js", the incremental build is stale: delete `apps/api/dist` and `apps/api/tsconfig.build.tsbuildinfo`, then rebuild.
 - Start the API **from `apps/api`** (it reads `apps/api/.env`), and the website with `pnpm --filter @offer-platform/web …`, so the two folders can't get mixed up.
 - Browsers may block the clipboard. Never make counting depend on it; the share button counts first, then copies or shows the link.
+- The local website runs on port 3001, but `apps/api/.env.example` allows only 5173: start the API with `CORS_ORIGINS=http://localhost:3001` (the environment beats the file) or add it to your `.env`.
+- Local notification emails are printed by the **worker** (`[DEV EMAIL]`); login codes are printed by the API.
+- Nest: a `@Post` that returns data answers 201 unless it has `@HttpCode(HttpStatus.OK)`.
 
 **Server**
 - t3.micro needs the swap file to build the image.
@@ -382,7 +402,7 @@ Images:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0015).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0016).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -465,7 +485,9 @@ Images:
 - Taps are counted.
 - Admins can handle reports end to end.
 
-### Phase 6. Notifications
+### Phase 6. Notifications — ✅ Done 2026-10-08 (PR #13)
+
+> Built as approved on 2026-10-08: inbox + email now, **push later with the mobile apps**; customers inbox-only by default; no "nearby offer" alerts; quiet hours 22:00–08:00 IST for customer emails; **no daily limit** (the owner changed 5 a day to none). The plan below is kept for history; §7 describes what was built.
 
 **Goal:** people hear about what matters to them without opening the site.
 
@@ -592,6 +614,31 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-08 · PR #13 · Phase 6: notifications · Claude (AI agent), plan approved by the product owner 2026-10-08
+- **What changed:**
+  - **ADR-0016:** in-process domain events (emitted after commit) + an email outbox in the notifications table.
+  - **API:**
+    - `infrastructure/events`: a global `DomainEvents` bus. Offer moderation, offer lifecycle (worker activation), business moderation and report warnings emit events.
+    - New module `notifications`: 13 message types, defaults per audience, preferences, inbox, signed unsubscribe, emails with "Open", "Stop emails like this" and "Manage notifications" links.
+    - Endpoints: `/me/notifications` (+ `unread-count`, `read`), `/me/notification-preferences`, public `POST /notifications/unsubscribe`.
+    - **Migration 0010:** `notifications` (inbox + email outbox) and `notification_preferences`.
+    - Worker queue `notifications`: email outbox every minute, offers ending within a day hourly, admin daily summary at 09:00 IST.
+    - Small read methods added to users, access-control, businesses, offers and engagement (ADR-0002).
+  - **Website:** 🔔 with the unread count in the header; `/notifications` inbox (mark read, mark all, open the link); notification settings on `/account#notifications`; `/unsubscribe` page. The header now wraps on phones (it overflowed at 375 px).
+  - **Owner change during the phase:** the customer email limit of 5 a day was removed ("no limit"); quiet hours stay.
+- **Why:** Phase 6 of the roadmap; specification §29.
+- **How it was verified:**
+  - API 184 unit + 149 integration tests, web 27; lint, types and builds clean.
+  - 4 new unit tests (defaults, quiet hours) and 8 new integration tests: business decisions → inbox + email sent; offer decisions; followers told once when an offer goes live, including activation by the worker; ending-soon once; customer opt-in + quiet hours; preferences + unsubscribe + forged token refused; inbox read/unread and ownership; admin summary once a day.
+  - Browser run against a local API, worker and database: an admin suspended and reactivated an offer → the owner got an inbox item and an email (sent by the worker), the follower got an inbox item only. Checked the bell count; clicking an inbox item (marks it read, opens the offer, clears the bell); a preference toggle saved; the unsubscribe link worked and a forged one was refused; phone width.
+- **Deploy / migration / env notes:**
+  - Migration 0010 runs automatically on deploy. **The worker must restart** with the new image (`deploy.sh` does it); its log must show "Notification jobs scheduled".
+  - No new environment variables (`APP_PUBLIC_URL` is used for email links; the unsubscribe key is derived from `OTP_HASH_SECRET`).
+- **Follow-ups:**
+  - Push notifications with the mobile apps (FCM proposed).
+  - Notification retention (Phase 8) and a real email provider (Phase 9; Gmail's ~500 a day).
+  - Phase 7 needs approval.
 
 ### 2026-10-08 · PR #12 · Phase 5: engagement and reports · Claude (AI agent), plan approved by the product owner 2026-10-03
 - **What changed:**

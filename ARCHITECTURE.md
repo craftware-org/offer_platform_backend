@@ -330,7 +330,7 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 1 | ~~Cloud provider~~ → **AWS Mumbai** (ADR-0011). Specific compute service decided in Phase 9 | Phase 9 |
 | 2 | SMS/OTP vendor + TRAI DLT registration status — **pending, owner discussing** | real OTP delivery (Phase 1 uses console provider) |
 | 3 | Maps/geocoding vendor (Google, Ola Maps, Mapbox/OSM) | address → coordinates (Phase 2) |
-| 4 | Push: FCM confirmed? | Phase 6 |
+| 4 | Push: FCM confirmed? | Mobile apps (Phase 6 shipped inbox + email only) |
 | 5 | Final product name / domain (preview: "Dodoom" at dodoom.vercel.app + sslip.io API) | public URLs, SEO (before launch) |
 | 6 | MVP target date (team: 3 people at Craftware, who build, host and operate) | planning only |
 
@@ -346,8 +346,8 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 3 | Offers: 7 types, create/edit, validation, server-side pricing, price history, moderation (every offer), scheduling, expiry worker (BullMQ) | ✅ Done 2026-09-30: full lifecycle tested, including the real worker (145 unit + 100 integration tests) |
 | 4 | Discovery: full-text + trigram search (any script), query understanding, near me (PostGIS), filters, rule-based ranking, home sections; plus email OTP login, /meta, preview mode and staging deployment | ✅ Done 2026-10-01 (167 unit + 119 integration tests); preview API live on EC2 |
 | Web | Next.js website (`apps/web`): customer pages, login, business portal, admin review ([ADR-0014](docs/adr/0014-web-app-nextjs-on-vercel.md)) | ✅ Done 2026-10-01: browser end-to-end run of the full MVP flow; live at https://dodoom.vercel.app |
-| 5 | Engagement: save, follow, share tracking, contact clicks, reports | |
-| 6 | Notifications: infrastructure, preferences, dispatch | |
+| 5 | Engagement: save, follow, share tracking, contact clicks, reports | ✅ Done 2026-10-08 (180 unit + 141 integration tests) |
+| 6 | Notifications: infrastructure, preferences, dispatch ([ADR-0016](docs/adr/0016-notifications-domain-events-and-email-outbox.md): in-app inbox + email; push later with the mobile apps) | ✅ Done 2026-10-08 (184 unit + 149 integration tests) |
 | 7 | Analytics: ingestion, aggregates, business + admin analytics | |
 | 8 | Security audit | Findings fixed |
 | 9 | Production readiness: production Docker image, AWS infrastructure, staging deploy pipeline, backups, monitoring, deployment docs | MVP success scenario passes against a real DB |

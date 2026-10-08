@@ -167,6 +167,27 @@ export class EngagementService {
     return this.offers.liveForBusinesses(await this.followedIds(userId), query);
   }
 
+  /** Who follows a business (for "a shop you follow posted an offer"). */
+  async followerIds(businessId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: businessFollowers.userId })
+      .from(businessFollowers)
+      .where(eq(businessFollowers.businessId, businessId));
+    return rows.map((r) => r.userId);
+  }
+
+  /** Who saved each of these offers (for "a saved offer ends soon"). */
+  async saverIdsByOffer(offerIds: string[]): Promise<Map<string, string[]>> {
+    if (offerIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ offerId: savedOffers.offerId, userId: savedOffers.userId })
+      .from(savedOffers)
+      .where(inArray(savedOffers.offerId, offerIds));
+    const map = new Map<string, string[]>();
+    for (const r of rows) map.set(r.offerId, [...(map.get(r.offerId) ?? []), r.userId]);
+    return map;
+  }
+
   // ---- Taps ------------------------------------------------------------------------------------
 
   /**

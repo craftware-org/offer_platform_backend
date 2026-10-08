@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { DomainEvents } from '../../infrastructure/events/domain-events.js';
 import { and, asc, count, desc, eq, ilike, type SQL } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
@@ -34,6 +35,7 @@ export class OfferModerationService {
     private readonly reader: OfferReader,
     private readonly businesses: BusinessReader,
     private readonly audit: AuditService,
+    private readonly events: DomainEvents,
   ) {}
 
   async list(query: AdminOfferQuery): Promise<Page<AdminOfferView>> {
@@ -76,6 +78,7 @@ export class OfferModerationService {
     input: OfferModerationInput,
     actor: { userId: string; requestId?: string },
   ): Promise<AdminOfferView> {
+    let newStatus = '';
     await this.db.transaction(async (tx) => {
       const [offer] = await tx.select().from(offers).where(eq(offers.id, offerId)).for('update');
       if (!offer) throw AppError.notFound('Offer');
@@ -96,6 +99,7 @@ export class OfferModerationService {
 
       const now = new Date();
       const next = nextOfferStatus(offer.status, input.action, offer, now);
+      newStatus = next;
       const set: Partial<typeof offers.$inferInsert> = {
         status: next,
         statusReason: ['REJECT', 'REQUEST_CHANGES', 'SUSPEND'].includes(input.action)
@@ -121,6 +125,16 @@ export class OfferModerationService {
         tx,
       );
     });
+    // Announced after commit (ADR-0016); notifications react, failures never undo the decision.
+    await this.events.emit('offer.moderated', {
+      offerId,
+      action: input.action,
+      status: newStatus,
+      reason: input.reason ?? null,
+    });
+    if (newStatus === 'ACTIVE' && (input.action === 'APPROVE' || input.action === 'REACTIVATE')) {
+      await this.events.emit('offer.went_live', { offerIds: [offerId] });
+    }
     return this.get(offerId);
   }
 }
