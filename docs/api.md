@@ -168,7 +168,7 @@ Design: [ADR-0016](adr/0016-notifications-domain-events-and-email-outbox.md). No
 | POST | `/me/notifications/read` | user | `{ids: [...]}` (max 100) or `{all: true}`; only your own; 204 |
 | GET | `/me/notification-preferences` | user | Types that apply to you (customer types always; shop types if you belong to a business; admin types if admin): `{type, audience, label, inApp, email, defaults}` |
 | PUT | `/me/notification-preferences` | user | `{type, inApp, email}`; 204 |
-| POST | `/notifications/unsubscribe` | none | `{token}` from the signed "Stop emails like this" link; turns email off for that one type. Returns `{type, label}`; a bad token is `400 VALIDATION_FAILED` |
+| POST | `/notifications/unsubscribe` | none | `{token}` from the signed "Stop emails like this" link; turns email off for that one type. Returns `{type, label}`; a bad token is `400 VALIDATION_ERROR` |
 
 Types: `BUSINESS_VERIFIED`, `BUSINESS_REJECTED`, `BUSINESS_SUSPENDED`, `BUSINESS_REACTIVATED`, `BUSINESS_WARNED`, `OFFER_APPROVED`, `OFFER_REJECTED`, `OFFER_CHANGES_REQUESTED`, `OFFER_SUSPENDED`, `OFFER_ENDING_SOON` (shop); `FOLLOWED_SHOP_NEW_OFFER`, `SAVED_OFFER_ENDING` (customer); `ADMIN_DAILY_SUMMARY` (admin).
 
