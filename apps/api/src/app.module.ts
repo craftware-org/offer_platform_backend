@@ -14,6 +14,8 @@ import { StorageModule } from './infrastructure/storage/storage.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
 import { AdminActivityModule } from './modules/admin-activity/admin-activity.module.js';
 import { EngagementModule } from './modules/engagement/engagement.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { DomainEventsModule } from './infrastructure/events/domain-events.js';
 import { ReportsModule } from './modules/reports/reports.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
@@ -49,7 +51,9 @@ import { UsersModule } from './modules/users/users.module.js';
     CategoriesModule,
     BusinessesModule,
     OffersModule,
+    DomainEventsModule,
     EngagementModule,
+    NotificationsModule,
     ReportsModule,
     AdminActivityModule,
     DiscoveryModule,

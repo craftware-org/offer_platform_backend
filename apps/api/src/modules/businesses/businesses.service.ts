@@ -228,6 +228,15 @@ export class BusinessesService {
     return toPublicView(await this.reader.bundle(row.id));
   }
 
+  /** People who manage a business (owner and staff), e.g. to notify them. */
+  async memberUserIds(businessId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ userId: businessStaff.userId })
+      .from(businessStaff)
+      .where(eq(businessStaff.businessId, businessId));
+    return rows.map((r) => r.userId);
+  }
+
   /** A verified business by id (for follows); 404 when it is not publicly visible. */
   async getPublicById(id: string): Promise<PublicBusinessView> {
     const [row] = await this.db

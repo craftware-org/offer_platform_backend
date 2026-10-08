@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { BusinessReader } from '../businesses/business-reader.js';
@@ -16,6 +16,30 @@ export class OfferReader {
     private readonly businesses: BusinessReader,
     private readonly categories: CategoriesService,
   ) {}
+
+  /** Minimal facts for messages about offers (title, link, owner business, dates). */
+  async summaries(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.db
+      .select({
+        id: offers.id,
+        title: offers.title,
+        slug: offers.slug,
+        businessId: offers.businessId,
+        status: offers.status,
+        expiresAt: offers.expiresAt,
+      })
+      .from(offers)
+      .where(inArray(offers.id, ids));
+  }
+
+  /** Live offers whose end falls inside [from, to) (the "ends within a day" scan). */
+  async endingWithin(from: Date, to: Date) {
+    return this.db
+      .select({ id: offers.id, title: offers.title, slug: offers.slug, businessId: offers.businessId, expiresAt: offers.expiresAt })
+      .from(offers)
+      .where(and(eq(offers.status, 'ACTIVE'), gte(offers.expiresAt, from), lt(offers.expiresAt, to)));
+  }
 
   /** Offer titles by id, for admin activity feeds (missing ids are simply absent). */
   async labelsFor(ids: string[]): Promise<Map<string, string>> {

@@ -157,6 +157,23 @@ All of these need a logged-in user. Only logged-in users' taps are counted (owne
 
 Report reasons: `OFFER_UNAVAILABLE`, `WRONG_DISCOUNT`, `MISLEADING_INFORMATION`, `BUSINESS_CLOSED`, `WRONG_LOCATION`, `OFFENSIVE_CONTENT`, `SUSPICIOUS_ACTIVITY`, `OTHER`.
 
+## Endpoints (Phase 6): notifications
+
+Design: [ADR-0016](adr/0016-notifications-domain-events-and-email-outbox.md). Notifications are created by the server when something happens (decisions, offers going live) and by worker scans; there is no endpoint to create one.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/me/notifications?page&pageSize` | user | Inbox, newest first. Items: `{id, type, title, body, link, read, createdAt}`; `meta.unread` = unread count |
+| GET | `/me/notifications/unread-count` | user | `{unread}` for the 🔔 badge |
+| POST | `/me/notifications/read` | user | `{ids: [...]}` (max 100) or `{all: true}`; only your own; 204 |
+| GET | `/me/notification-preferences` | user | Types that apply to you (customer types always; shop types if you belong to a business; admin types if admin): `{type, audience, label, inApp, email, defaults}` |
+| PUT | `/me/notification-preferences` | user | `{type, inApp, email}`; 204 |
+| POST | `/notifications/unsubscribe` | none | `{token}` from the signed "Stop emails like this" link; turns email off for that one type. Returns `{type, label}`; a bad token is `400 VALIDATION_ERROR` |
+
+Types: `BUSINESS_VERIFIED`, `BUSINESS_REJECTED`, `BUSINESS_SUSPENDED`, `BUSINESS_REACTIVATED`, `BUSINESS_WARNED`, `OFFER_APPROVED`, `OFFER_REJECTED`, `OFFER_CHANGES_REQUESTED`, `OFFER_SUSPENDED`, `OFFER_ENDING_SOON` (shop); `FOLLOWED_SHOP_NEW_OFFER`, `SAVED_OFFER_ENDING` (customer); `ADMIN_DAILY_SUMMARY` (admin).
+
+Defaults: inbox always on; email on for shop and admin types, off for customer types (customers opt in per type). Emails go only to verified addresses. Customer emails wait out quiet hours (22:00–08:00 IST); there is no daily limit (owner, 2026-10-08).
+
 ### `GET /discover/offers`
 
 | Parameter | Meaning |

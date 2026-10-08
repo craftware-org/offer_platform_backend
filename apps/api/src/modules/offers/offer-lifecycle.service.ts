@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { DomainEvents } from '../../infrastructure/events/domain-events.js';
 import { and, eq, gt, inArray, lte } from 'drizzle-orm';
 import { DB, type Database } from '../../infrastructure/database/database.module.js';
 import { offers } from './offers.schema.js';
@@ -12,7 +13,10 @@ import { offers } from './offers.schema.js';
 export class OfferLifecycleService {
   private readonly logger = new Logger(OfferLifecycleService.name);
 
-  constructor(@Inject(DB) private readonly db: Database) {}
+  constructor(
+    @Inject(DB) private readonly db: Database,
+    private readonly events: DomainEvents,
+  ) {}
 
   async runTransitions(now = new Date()): Promise<{ activated: number; expired: number }> {
     const expired = await this.db
@@ -31,6 +35,8 @@ export class OfferLifecycleService {
       .set({ status: 'ACTIVE' })
       .where(and(eq(offers.status, 'SCHEDULED'), lte(offers.startsAt, now), gt(offers.expiresAt, now)))
       .returning({ id: offers.id });
+
+    if (activated.length) await this.events.emit('offer.went_live', { offerIds: activated.map((a) => a.id) });
 
     if (expired.length || activated.length) {
       this.logger.log(

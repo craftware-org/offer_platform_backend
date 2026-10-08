@@ -1,3 +1,4 @@
+import { DomainEvents } from '../src/infrastructure/events/domain-events.js';
 import { NestFactory } from '@nestjs/core';
 import { eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
@@ -30,7 +31,7 @@ describe('Offers: create → review → live → expire (real Postgres/PostGIS +
 
   const grant = (userId: string, role: Role) =>
     ctx.app.get(AccessControlService).grantRole(userId, role, null);
-  const lifecycle = () => new OfferLifecycleService(ctx.db);
+  const lifecycle = () => new OfferLifecycleService(ctx.db, ctx.app.get(DomainEvents));
 
   /** Registers a business and takes it through verification (verified by `verifier`). */
   const verifiedBusiness = async (who: LoggedIn, name: string, verifier: LoggedIn = admin) => {

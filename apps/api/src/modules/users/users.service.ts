@@ -49,6 +49,29 @@ export class UsersService {
   ) {}
 
   /**
+   * Where to email active users: only **verified** addresses (an email typed into a profile never
+   * receives mail, ADR-0013/0016). Users without one are simply absent from the map.
+   */
+  async verifiedEmails(ids: string[]): Promise<Map<string, { email: string; name: string | null }>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: users.id, email: users.email, name: users.name })
+      .from(users)
+      .where(and(inArray(users.id, ids), isNotNull(users.emailVerifiedAt), eq(users.status, 'ACTIVE')));
+    return new Map(rows.flatMap((r) => (r.email ? [[r.id, { email: r.email, name: r.name }] as const] : [])));
+  }
+
+  /** Active users among `ids` (suspended and deleted accounts get no notifications). */
+  async activeIds(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(inArray(users.id, ids), eq(users.status, 'ACTIVE')));
+    return new Set(rows.map((r) => r.id));
+  }
+
+  /**
    * Display names by id for admin activity feeds: name, else email, else phone.
    * Deleted accounts show as "Deleted user" (their personal data is erased).
    */
