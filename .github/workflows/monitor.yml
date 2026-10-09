@@ -1,0 +1,103 @@
+name: Monitor preview
+
+# Phase 9 monitoring without an extra vendor. Every 15 minutes:
+# - the API is ready (database + Valkey), the worker reported in the last 3 minutes;
+# - on the server: disk below 80 %, enough free memory, all 5 containers running, a backup from the
+#   last 26 hours.
+# Any failure opens (or updates) a GitHub issue labelled "monitoring", which emails the watchers;
+# the issue is closed automatically when everything is fine again.
+# GitHub can delay scheduled runs by some minutes; it pauses schedules in repositories with no
+# activity for 60 days.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitor-preview
+  cancel-in-progress: true
+
+env:
+  API: https://13-235-201-166.sslip.io/api/v1
+  HOST: 13.235.201.166
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checks
+        id: checks
+        env:
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          problems=()
+          curl -fsS --max-time 10 "$API/health/ready" >/dev/null || problems+=("API is not ready ($API/health/ready)")
+          worker=$(curl -sS --max-time 10 "$API/health/worker" || true)
+          echo "$worker" | grep -q '"status":"ok"' || problems+=("Worker check failed: $worker")
+
+          if [ -n "$STAGING_SSH_KEY" ]; then
+            install -m 700 -d ~/.ssh
+            printf '%s\n' "$STAGING_SSH_KEY" > ~/.ssh/key && chmod 600 ~/.ssh/key
+            echo "$HOST ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjZfiwYpe02nOmJ1yQAvc7q/p+dHNXHBub1ipc/jdK4" > ~/.ssh/known_hosts
+            server=$(ssh -i ~/.ssh/key -o BatchMode=yes -o ConnectTimeout=15 "ubuntu@$HOST" '
+              cd /opt/offer-platform/src/deploy/staging
+              echo "disk=$(df --output=pcent / | tail -1 | tr -dc 0-9)"
+              echo "memavail=$(free -m | awk "/^Mem:/ {print \$7}")"
+              echo "running=$(docker compose ps --status running --services < /dev/null | sort | tr "\n" " ")"
+              newest=$(ls -1t backups/offer_platform-*.dump 2>/dev/null | head -1)
+              echo "backupage=$(( ( $(date +%s) - $(stat -c %Y "$newest" 2>/dev/null || echo 0) ) / 3600 ))"
+            ' 2>&1) || problems+=("Could not reach the server over SSH: $server")
+            rm -f ~/.ssh/key
+            disk=$(echo "$server" | sed -n 's/^disk=//p')
+            mem=$(echo "$server" | sed -n 's/^memavail=//p')
+            running=$(echo "$server" | sed -n 's/^running=//p')
+            backup=$(echo "$server" | sed -n 's/^backupage=//p')
+            [ -n "$disk" ] && [ "$disk" -ge 80 ] && problems+=("Disk is ${disk}% full")
+            [ -n "$mem" ] && [ "$mem" -lt 100 ] && problems+=("Only ${mem} MB of memory available")
+            for svc in api caddy postgres valkey worker; do
+              [ -n "$running" ] && ! echo " $running " | grep -q " $svc " && problems+=("Container '$svc' is not running")
+            done
+            [ -n "$backup" ] && [ "$backup" -gt 26 ] && problems+=("Newest backup is ${backup} hours old")
+            echo "Server: disk ${disk}% · memory available ${mem} MB · running: ${running}· newest backup ${backup} h old"
+          else
+            echo "STAGING_SSH_KEY is not set: server checks skipped (only the HTTP checks ran)."
+          fi
+
+          if [ ${#problems[@]} -gt 0 ]; then
+            printf -- '- %s\n' "${problems[@]}" > problems.md
+            cat problems.md
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "All checks passed."
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update the alert issue
+        if: steps.checks.outputs.failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh label create monitoring --color B60205 --description "Preview monitoring alerts" 2>/dev/null || true
+          body="$(cat problems.md)
+
+          Seen at $(date -u +%FT%TZ). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Runbook: CLAUDE.md §6 (status, logs) and docs/deployment.md."
+          open=$(gh issue list --label monitoring --state open --json number --jq '.[0].number')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "$body"; else gh issue create --title "Preview monitoring alert" --label monitoring --body "$body"; fi
+          exit 1
+
+      - name: Close the alert issue when healthy again
+        if: steps.checks.outputs.failed == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          open=$(gh issue list --label monitoring --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$open" ]; then gh issue close "$open" --comment "All checks pass again ($(date -u +%FT%TZ))."; fi

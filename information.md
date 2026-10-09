@@ -90,6 +90,7 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-09 | **Phase 9 (production readiness) approved.**<br>• Name **Dodoom**; the domain is decided later (dodoom.com is taken by someone else).<br>• **MSG91** for SMS; DLT registration by Craftware.<br>• **Managed database:** RDS PostgreSQL + S3, with API, worker and Valkey on EC2.<br>• Work that needs no decision comes first: automatic deploys, monitoring, browser tests, off-server backups, draft legal pages. |
 | 2026-10-09 | **Phase 8 (security audit) approved and built.**<br>• **Admins use 2-step login with an authenticator app.**<br>• Server secrets are rotated **at launch only**.<br>• **Longer retention:** login codes 90 days, ended sessions 90 days, notifications 1 year, activity log 7 years.<br>• When an owner deletes their account, **their shops are closed**.<br>• Six low-risk findings are **accepted until Phase 9**: login token in browser storage, inline styles, API docs on the preview, phone codes in the preview log, report notes kept, backups on the same disk. |
 | 2026-10-08 | **Phase 7 (analytics) approved** (built 2026-10-09). Page views and taps are counted **for everyone**, logged in or not (this replaces the logged-in-only rule for taps), without storing who they are. **Searches are recorded** (words, city, result count; no user). **Raw events are kept 180 days**, daily totals forever. Businesses get a **weekly summary** on Mondays. |
 | 2026-10-08 | **Phase 6 (notifications) approved and built.** In-app inbox + email now; **push later, with the mobile apps** (FCM proposed). Shop and admin messages are emailed by default; **customers get the inbox only** unless they turn email on per type. No "nearby offer" alerts. Customer emails wait out quiet hours (22:00–08:00 IST). The first plan had a limit of 5 customer emails a day; the owner then chose **no limit**. |
@@ -567,7 +568,7 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | 6 | **Notifications:** 🔔 inbox + email; shop, customer and admin messages; per-type preferences; quiet hours; one-click unsubscribe | ✅ Done 2026-10-08 (push later with the mobile apps) | — |
 | 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
 | 8 | **Security audit:** ASVS L2 review ([report](docs/security-audit-2026-10-09.md)), admin 2-step login, every-route permission test, complete account deletion, retention clean-up, dependency fixes, backup restore drill | ✅ Done 2026-10-09 (secrets rotate at launch) | — |
-| 9 | **Production readiness (next):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
+| 9 | **Production readiness (in progress; automatic deploys and monitoring done):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
 | Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
@@ -656,7 +657,7 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 194 unit + 163 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- API: 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
 - Website: 30 unit tests.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
@@ -686,13 +687,14 @@ Legend:
 
 ## 14. Decisions still needed from the product owner
 
-1. **SMS provider** + TRAI DLT registration, for real phone login and phone password reset.
-2. **Maps provider** (Google / Ola Maps / Mapbox), for a map picker and address search.
-3. **Final product name and domain.** Moving takes about 30 minutes of configuration: DNS, API settings, Vercel variable.
+Decided on 2026-10-09: the name **Dodoom**, **MSG91** for SMS, and a **managed database** (RDS + S3). Phase 9 is approved.
+
+1. **TRAI DLT registration** with MSG91 (entity, sender ID, OTP template), done by Craftware: needed for real phone login.
+2. **Domain**: dodoom.com is taken by someone else; dodoom.in is registered (to confirm whether it's ours); dodoom.app, .co.in and .co looked free on 2026-10-09.
+3. **Maps provider** (Google / Ola Maps / Mapbox), for a map picker and address search.
 4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
-6. **MVP launch date** and **AWS budget**, for Phase 9.
-7. **Approval of Phase 9** (production readiness), after decisions 1, 3 and 6.
+6. **MVP launch date** and **AWS budget** (a small RDS is about $15+/month, from third-party listings; to be confirmed on AWS's own pricing pages).
 
 ---
 

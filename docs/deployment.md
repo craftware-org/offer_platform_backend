@@ -39,11 +39,36 @@ ssh -i <key.pem> ubuntu@<ip> 'bash setup-server.sh <ip-with-dashes>.sslip.io'
 
 ## 3. Deploy (every release)
 
+**Automatic (Phase 9):** the CI job "Deploy API to the preview server" runs `deploy.sh` after every green push to `main`. It uses:
+- the GitHub repository secret `STAGING_SSH_KEY`: the private key of a dedicated deploy key, `~/.ssh/offer-platform-ci` on the owner's machine;
+- the matching public key on the server in `~/.ssh/authorized_keys` with the `restrict` option (commands only: no terminal, no port or agent forwarding);
+- the server's host key, pinned in the workflow.
+
+To replace the deploy key:
+1. Create a new pair: `ssh-keygen -t ed25519 -N "" -f ~/.ssh/offer-platform-ci`.
+2. On the server, swap the `github-actions-deploy@offer-platform` line in `~/.ssh/authorized_keys` for `restrict <new .pub contents>`.
+3. Paste the new **private** key into GitHub → repository Settings → Secrets and variables → Actions → `STAGING_SSH_KEY`.
+
+**Manual** (still works, e.g. to deploy a branch before merging):
+
 ```bash
 bash deploy/staging/deploy.sh <ip> <key.pem>
 ```
 
 This ships the **committed** source (`git archive`: no `.env`, no local files) and builds the image on the server. The `migrate` service then applies migrations and syncs roles; `api` and `worker` restart, and the script waits for `https://<domain>/api/v1/health/ready`.
+
+## Monitoring (Phase 9)
+
+`.github/workflows/monitor.yml` runs every 15 minutes (and on demand from the Actions tab).
+
+**What it checks:**
+- `GET /api/v1/health/ready`: database and Valkey;
+- `GET /api/v1/health/worker`: the worker writes a heartbeat to Valkey every minute, and the check fails after 3 minutes of silence;
+- over SSH with the deploy key: disk below 80 %, more than 100 MB of memory available, the containers `api caddy postgres valkey worker` running, and a backup no older than 26 hours.
+
+**Alerts:** a failure opens a GitHub issue labelled `monitoring`, or comments on the open one. The issue closes itself when all checks pass again. Watchers of the repository get these by email.
+
+**Without the `STAGING_SSH_KEY` secret,** only the two HTTP checks run.
 
 ## 4. Email login codes (Gmail)
 
