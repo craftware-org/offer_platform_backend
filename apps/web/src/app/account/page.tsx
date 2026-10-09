@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { NotificationSettings } from '@/components/notification-settings';
+import { TwoStepSettings } from '@/components/two-step-settings';
 import { RequireAuth } from '@/components/require-auth';
 import { api, errorMessage, session } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -114,6 +115,8 @@ function Account() {
       </form>
 
       {user.hasPassword ? <ChangePassword /> : <SetPassword onDone={reload} />}
+
+      <TwoStepSettings />
 
       <NotificationSettings />
 

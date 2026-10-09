@@ -90,6 +90,7 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-09 | **Phase 8 (security audit) approved and built.**<br>• **Admins use 2-step login with an authenticator app.**<br>• Server secrets are rotated **at launch only**.<br>• **Longer retention:** login codes 90 days, ended sessions 90 days, notifications 1 year, activity log 7 years.<br>• When an owner deletes their account, **their shops are closed**.<br>• Six low-risk findings are **accepted until Phase 9**: login token in browser storage, inline styles, API docs on the preview, phone codes in the preview log, report notes kept, backups on the same disk. |
 | 2026-10-08 | **Phase 7 (analytics) approved** (built 2026-10-09). Page views and taps are counted **for everyone**, logged in or not (this replaces the logged-in-only rule for taps), without storing who they are. **Searches are recorded** (words, city, result count; no user). **Raw events are kept 180 days**, daily totals forever. Businesses get a **weekly summary** on Mondays. |
 | 2026-10-08 | **Phase 6 (notifications) approved and built.** In-app inbox + email now; **push later, with the mobile apps** (FCM proposed). Shop and admin messages are emailed by default; **customers get the inbox only** unless they turn email on per type. No "nearby offer" alerts. Customer emails wait out quiet hours (22:00–08:00 IST). The first plan had a limit of 5 customer emails a day; the owner then chose **no limit**. |
 | 2026-10-03 | **Phase 5 (engagement) approved.** Only logged-in users can report; admins can dismiss, warn the business, suspend the offer or suspend the business; **only logged-in users' taps are counted** (changed to everyone on 2026-10-08, Phase 7); businesses see simple totals now. |
@@ -260,6 +261,17 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
   - access token valid 15 minutes;
   - refresh token valid 30 days, single-use and rotating; a reused token ends the whole session;
   - logout; delete account.
+- **2-step login** (Phase 8, ADR-0018):
+  - authenticator app (TOTP), **required for every admin permission**; anyone may turn it on;
+  - setup: QR code, first code, 10 one-time recovery codes;
+  - every login path then asks for the app code (`POST /auth/mfa/verify`);
+  - codes work once; 5 wrong codes lock it for 15 minutes; secrets encrypted;
+  - a Super admin can reset it (lost phone); `admin:reset-mfa` on the server for emergencies.
+- **Account deletion** (completed in Phase 8):
+  - erases the account, sessions, login codes, 2-step login, notifications and their settings, saves and follows;
+  - unlinks past taps;
+  - **closes the shops the person owns**: hidden, offers ended, owner photo deleted.
+- **Retention** (nightly, 03:00 IST): login codes 90 days, ended sessions 90 days, notifications 1 year, activity log 7 years.
 
 ### `audit` and `admin-activity`
 - **audit:** important actions are recorded **in the same database transaction** as the change. Each record holds who acted, the action, the item, before and after values, and the request ID. Records are never edited. Raw feed: `GET /admin/audit-logs`.
@@ -506,7 +518,8 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 - One generic login error, with equal hashing cost (no account enumeration).
 
 **Access control:**
-- Permissions checked on the server for every request.
+- Permissions checked on the server for every request; every admin permission also needs 2-step login (authenticator app).
+- An automatic test walks every route and proves visitors, customers and admins without 2-step login are refused.
 - An unverified email never logs anyone in and never receives a role.
 - Suspension applies immediately.
 
@@ -553,8 +566,8 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | 5 | **Engagement:** save offers, follow businesses, share and contact-tap counts (logged-in users; everyone since Phase 7), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 | — |
 | 6 | **Notifications:** 🔔 inbox + email; shop, customer and admin messages; per-type preferences; quiet hours; one-click unsubscribe | ✅ Done 2026-10-08 (push later with the mobile apps) | — |
 | 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
-| 8 | **Security audit:** OWASP ASVS L2 review, permission tests per endpoint, dependency audit, secret rotation, upload review, backup restore drill, DPDP review | ⏳ Next, **needs approval** | — |
-| 9 | **Production readiness:** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
+| 8 | **Security audit:** ASVS L2 review ([report](docs/security-audit-2026-10-09.md)), admin 2-step login, every-route permission test, complete account deletion, retention clean-up, dependency fixes, backup restore drill | ✅ Done 2026-10-09 (secrets rotate at launch) | — |
+| 9 | **Production readiness (next):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
 | Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
@@ -574,7 +587,8 @@ Legend:
 |---|---|
 | Free MVP, monetization flags off | ✅ |
 | Market data not tied to Hubballi (country/state/city/area/lat/lng/radius) | ✅ |
-| Customer login (codes, email, password, reset, logout, delete account) | ✅ (phone codes need the SMS vendor) |
+| Customer login (codes, email, password, reset, logout, delete account) | ✅ (phone codes need the SMS vendor); account deletion complete, owned shops closed (Phase 8) |
+| Admin 2-step login | ✅ authenticator app (Phase 8) |
 | Customer profile: name, phone, email | ✅ |
 | Customer profile: notification preferences | ✅ |
 | Customer profile: photo, interests | ⏳ (not scheduled) |
@@ -642,7 +656,7 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 190 unit + 155 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- API: 194 unit + 163 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
 - Website: 30 unit tests.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
@@ -652,7 +666,10 @@ Legend:
 - all admin screens (2026-10-02);
 - Phase 5 engagement and reports (2026-10-08);
 - Phase 6 notifications: bell, inbox, settings, email and unsubscribe (2026-10-08);
-- Phase 7 analytics: shop Performance page, admin Insights, view counting from a real browser (2026-10-09).
+- Phase 7 analytics: shop Performance page, admin Insights, view counting from a real browser (2026-10-09);
+- Phase 8: admin 2-step setup and login with an authenticator app (2026-10-09).
+
+**Security audit:** [docs/security-audit-2026-10-09.md](docs/security-audit-2026-10-09.md). The backup restore drill passed on the preview server.
 
 **A change is done only when:**
 - the tests pass, including integration tests against a real database, and CI is green;
@@ -675,7 +692,7 @@ Legend:
 4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget**, for Phase 9.
-7. **Approval of Phase 8** (security audit), the next phase.
+7. **Approval of Phase 9** (production readiness), after decisions 1, 3 and 6.
 
 ---
 

@@ -1,10 +1,10 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { DomainEvents } from '../../infrastructure/events/domain-events.js';
-import { and, asc, count, desc, eq, ilike, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray, type SQL } from 'drizzle-orm';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
 import { escapeLike } from '../../common/text/like.js';
-import { DB, type Database } from '../../infrastructure/database/database.module.js';
+import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
 import { BusinessReader } from '../businesses/business-reader.js';
 import { OfferReader } from './offer-reader.js';
@@ -136,5 +136,21 @@ export class OfferModerationService {
       await this.events.emit('offer.went_live', { offerIds: [offerId] });
     }
     return this.get(offerId);
+  }
+
+  /** A business was closed (its owner deleted their account): every offer that isn't over ends now. */
+  async endAllForClosedBusinesses(businessIds: string[], tx: Executor): Promise<number> {
+    if (businessIds.length === 0) return 0;
+    const ended = await tx
+      .update(offers)
+      .set({ status: 'EXPIRED', statusReason: 'The shop was closed' })
+      .where(
+        and(
+          inArray(offers.businessId, businessIds),
+          inArray(offers.status, ['DRAFT', 'PENDING_REVIEW', 'SCHEDULED', 'ACTIVE', 'PAUSED']),
+        ),
+      )
+      .returning({ id: offers.id });
+    return ended.length;
   }
 }

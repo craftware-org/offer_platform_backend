@@ -11,6 +11,13 @@ import { dummyHash, hashPassword, verifyPassword } from './password-hasher.js';
 import { passwordProblem } from './password-policy.js';
 import { OtpService, type OtpTarget } from './otp.service.js';
 import { normalizePhone } from '../../common/phone/phone.js';
+import { BusinessImagesService } from '../businesses/business-images.service.js';
+import { BusinessesService } from '../businesses/businesses.service.js';
+import { EngagementService } from '../engagement/engagement.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { OfferModerationService } from '../offers/offer-moderation.service.js';
+import { AuthDataService } from './auth-data.module.js';
+import { MfaService, type MfaChallenge } from './mfa.service.js';
 import { invalidRefreshToken, TokenService, type TokenPair } from './token.service.js';
 
 export const accountSuspended = () =>
@@ -37,6 +44,9 @@ export interface LoginResult extends TokenPair {
   user: UserView;
 }
 
+/** A login either finishes, or (2-step login on, ADR-0018) asks for the authenticator code. */
+export type LoginOutcome = LoginResult | MfaChallenge;
+
 interface RequestContext {
   userAgent?: string;
   requestId?: string;
@@ -60,6 +70,13 @@ export class AuthService {
     private readonly accessControl: AccessControlService,
     private readonly audit: AuditService,
     private readonly rateLimiter: RateLimiterService,
+    private readonly mfa: MfaService,
+    private readonly authData: AuthDataService,
+    private readonly notifications: NotificationsService,
+    private readonly engagement: EngagementService,
+    private readonly businesses: BusinessesService,
+    private readonly businessImages: BusinessImagesService,
+    private readonly offerModeration: OfferModerationService,
   ) {}
 
   async requestOtp(identity: LoginIdentity, clientIp: string) {
@@ -67,20 +84,43 @@ export class AuthService {
     return this.otp.request(this.target(identity), clientIp);
   }
 
-  async verifyOtp(identity: LoginIdentity, code: string, ctx: RequestContext): Promise<LoginResult> {
+  async verifyOtp(identity: LoginIdentity, code: string, ctx: RequestContext): Promise<LoginOutcome> {
     const target = this.target(identity);
     await this.otp.verify(target.destination, code);
 
-    const { user, created, tokens } = await this.db.transaction(async (tx) => {
+    const { user, created } = await this.db.transaction(async (tx) => {
       const found =
         target.channel === 'SMS'
           ? await this.users.findOrCreateByPhone(target.destination, tx)
           : await this.users.findOrCreateByVerifiedEmail(target.destination, tx);
       if (found.user.status === 'SUSPENDED') throw accountSuspended();
       await this.users.markLogin(found.user.id, tx);
-      return { ...found, tokens: await this.tokens.issue(found.user.id, ctx.userAgent, tx) };
+      return found;
     });
-    return { ...tokens, isNewUser: created, user: await this.users.getView(user.id) };
+    return this.finishLogin(user.id, created, ctx);
+  }
+
+  /**
+   * The last step of every login: a session, or, when 2-step login is on, a challenge for
+   * POST /auth/mfa/verify (ADR-0018). Forgot-password goes through here too, so a reset can't skip it.
+   */
+  private async finishLogin(userId: string, isNewUser: boolean, ctx: RequestContext): Promise<LoginOutcome> {
+    if (await this.mfa.isEnabled(userId)) return this.mfa.challenge(userId);
+    const tokens = await this.tokens.issue(userId, ctx.userAgent, this.db);
+    return { ...tokens, isNewUser, user: await this.users.getView(userId) };
+  }
+
+  /** Second step of a login with 2-step login on: an authenticator code or a recovery code. */
+  async verifyMfa(
+    mfaToken: string,
+    answer: { code?: string; recoveryCode?: string },
+    ctx: RequestContext,
+  ): Promise<LoginResult> {
+    const { userId, tokens } = await this.mfa.completeChallenge(mfaToken, answer, ctx);
+    const principal = await this.accessControl.loadPrincipal(userId);
+    if (!principal || principal.status === 'DELETED') throw AppError.unauthenticated();
+    if (principal.status === 'SUSPENDED') throw accountSuspended();
+    return { ...tokens, isNewUser: false, user: await this.users.getView(userId) };
   }
 
   // ---- Passwords (ADR-0015) ------------------------------------------------------------------
@@ -95,7 +135,7 @@ export class AuthService {
     password: string,
     clientIp: string,
     ctx: RequestContext,
-  ): Promise<LoginResult> {
+  ): Promise<LoginOutcome> {
     const target = this.target(identity);
     await this.rateLimiter.consume(`pwd:ip:${clientIp}`, PASSWORD_MAX_TRIES_PER_IP, PASSWORD_LOCK_SECONDS);
     const failKey = `pwd:fail:${target.destination}`;
@@ -115,11 +155,8 @@ export class AuthService {
     await this.rateLimiter.clear(failKey);
     if (user.status === 'SUSPENDED') throw accountSuspended();
 
-    const tokens = await this.db.transaction(async (tx) => {
-      await this.users.markLogin(user.id, tx);
-      return this.tokens.issue(user.id, ctx.userAgent, tx);
-    });
-    return { ...tokens, isNewUser: false, user: await this.users.getView(user.id) };
+    await this.users.markLogin(user.id, this.db);
+    return this.finishLogin(user.id, false, ctx);
   }
 
   /** First password for an account that logged in with a code. Changing an existing one needs the current password. */
@@ -136,12 +173,15 @@ export class AuthService {
     return this.users.getView(userId);
   }
 
-  /** Requires the current password. Ends every session and returns fresh tokens for this device. */
+  /**
+   * Requires the current password. Ends every session and returns fresh tokens for this device,
+   * keeping whether this session passed the authenticator step.
+   */
   async changePassword(
     userId: string,
     currentPassword: string,
     newPassword: string,
-    ctx: RequestContext,
+    ctx: RequestContext & { mfa?: boolean },
   ): Promise<TokenPair> {
     const user = await this.users.getRow(userId);
     const failKey = `pwd:fail:user:${userId}`;
@@ -149,9 +189,14 @@ export class AuthService {
     if (locked.count >= PASSWORD_MAX_FAILURES) throw AppError.rateLimited(locked.retryAfterSeconds);
     if (!user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
       await this.rateLimiter.hit(failKey, PASSWORD_MAX_FAILURES, PASSWORD_LOCK_SECONDS);
-      throw new AppError(ErrorCode.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED, 'The current password is not correct', {
-        currentPassword: 'Not correct',
-      });
+      throw new AppError(
+        ErrorCode.INVALID_CREDENTIALS,
+        HttpStatus.UNAUTHORIZED,
+        'The current password is not correct',
+        {
+          currentPassword: 'Not correct',
+        },
+      );
     }
     await this.rateLimiter.clear(failKey);
     const hash = await this.hashChecked(newPassword, user, 'newPassword');
@@ -159,7 +204,7 @@ export class AuthService {
       await this.users.setPasswordHash(userId, hash, tx);
       await this.tokens.revokeAllForUser(userId, tx);
       await this.recordPassword(AuditAction.PASSWORD_CHANGED, userId, ctx, tx);
-      return this.tokens.issue(userId, ctx.userAgent, tx);
+      return this.tokens.issue(userId, ctx.userAgent, tx, ctx.mfa === true);
     });
   }
 
@@ -173,14 +218,14 @@ export class AuthService {
     code: string,
     newPassword: string,
     ctx: RequestContext,
-  ): Promise<LoginResult> {
+  ): Promise<LoginOutcome> {
     const target = this.target(identity);
     const policy = passwordProblem(newPassword, [target.destination]);
     if (policy) throw AppError.validation({ newPassword: policy });
     await this.otp.verify(target.destination, code);
     const hash = await hashPassword(newPassword);
 
-    const { user, created, tokens } = await this.db.transaction(async (tx) => {
+    const { user, created } = await this.db.transaction(async (tx) => {
       const found =
         target.channel === 'SMS'
           ? await this.users.findOrCreateByPhone(target.destination, tx)
@@ -190,10 +235,10 @@ export class AuthService {
       await this.tokens.revokeAllForUser(found.user.id, tx);
       await this.recordPassword(AuditAction.PASSWORD_RESET, found.user.id, ctx, tx);
       await this.users.markLogin(found.user.id, tx);
-      return { ...found, tokens: await this.tokens.issue(found.user.id, ctx.userAgent, tx) };
+      return found;
     });
     await this.rateLimiter.clear(`pwd:fail:${target.destination}`);
-    return { ...tokens, isNewUser: created, user: await this.users.getView(user.id) };
+    return this.finishLogin(user.id, created, ctx);
   }
 
   private async hashChecked(password: string, user: UserRow, field = 'password'): Promise<string> {
@@ -242,21 +287,39 @@ export class AuthService {
     await this.tokens.revokeSessionOf(refreshToken);
   }
 
-  /** Erases personal data and ends every session (DPDP right to erasure). */
+  /**
+   * Erases personal data and ends every session (DPDP right to erasure), in one transaction:
+   * - the account: name, phone, email, password, verification dates, roles;
+   * - sessions, login codes sent to the phone/email, 2-step login, notifications and their settings;
+   * - saves and follows; past taps stay counted but no longer point at the person;
+   * - shops they own are closed (owner decision 2026-10-09): hidden, offers ended, owner photo deleted.
+   * The activity log keeps the record that it happened (7-year retention).
+   */
   async deleteAccount(userId: string, ctx: RequestContext): Promise<void> {
-    await this.db.transaction(async (tx) => {
+    const before = await this.users.getRow(userId);
+    const destinations = [before.phone, before.email].filter((d): d is string => !!d);
+    const photoFiles = await this.db.transaction(async (tx) => {
       await this.users.anonymize(userId, tx);
-      await this.tokens.revokeAllForUser(userId, tx);
+      await this.mfa.remove(userId, tx);
+      await this.authData.forgetUser(userId, destinations, tx);
+      await this.notifications.forgetUser(userId, tx);
+      await this.engagement.forgetUser(userId, tx);
+      const closedIds = await this.businesses.closeOwnedBy(userId, tx, ctx.requestId);
+      await this.offerModeration.endAllForClosedBusinesses(closedIds, tx);
+      const files = await this.businessImages.removeOwnerPhotos(closedIds, tx);
       await this.audit.record(
         {
           actorUserId: userId,
           action: AuditAction.USER_DELETED_ACCOUNT,
           entityType: 'user',
           entityId: userId,
+          newValue: closedIds.length ? { closedBusinesses: closedIds } : null,
           requestId: ctx.requestId,
         },
         tx,
       );
+      return files;
     });
+    await this.businessImages.deleteFiles(photoFiles);
   }
 }

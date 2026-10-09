@@ -61,10 +61,10 @@ Other rules:
 | 5 | **Engagement**: save offers, follow businesses, share and contact-tap counts (logged-in users; everyone since Phase 7), report an offer + admin report queue, business totals and warnings | ✅ Done 2026-10-08 |
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
-| 8 | Security audit (findings fixed) | ⏳ Next (needs approval) |
-| 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ |
+| 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
+| 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ Next (needs owner decisions + approval) |
 
-**Tests (all must stay green):** API 190 unit + 155 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 194 unit + 163 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit
 
 ---
 
@@ -118,9 +118,10 @@ apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, Postgre
                           admin-activity (audit feed with names)
                           (modules talk only via exported services)
   src/jobs/               BullMQ jobs (offer lifecycle; notifications: email outbox, ending soon, admin summary;
-                          analytics: nightly totals + 180-day clean-up, weekly business summary)
-  src/cli/                migrate, seed, grant-role, add-localities, export-openapi
-  database/migrations/    SQL migrations (0000–0011); some PostGIS/search SQL is hand-written
+                          analytics: nightly totals + 180-day clean-up, weekly business summary;
+                          maintenance: nightly retention clean-up of personal data)
+  src/cli/                migrate, seed, grant-role, add-localities, reset-mfa (emergency), export-openapi
+  database/migrations/    SQL migrations (0000–0012); some PostGIS/search SQL is hand-written
   test/                   Integration tests (e2e-spec) + helpers (per-file database cloned from a template)
 apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind CSS 4
   src/app/                Routes (see §7)
@@ -128,7 +129,7 @@ apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind C
   src/lib/                api client + session, auth context, types, money, time, location, offer-form
   src/proxy.ts            Per-request CSP nonce (Next 16 "proxy" = old middleware)
 deploy/staging/           EC2 preview server: docker-compose, Caddyfile, setup-server.sh, deploy.sh,
-                          set-secret.sh, backup.sh, .env.example
+                          set-secret.sh, backup.sh, restore-drill.sh, .env.example
 docs/                     ADRs (docs/adr) and guides (api, auth, authorization, database, business/offer
                           workflow, moderation, deployment)
 ARCHITECTURE.md           Overall design (accepted 2026-09-30)
@@ -197,7 +198,10 @@ It uploads the **committed** source (`git archive`, so no local files and no `.e
 | Notification jobs | `docker compose logs worker \| grep -i notification` (startup: "Notification jobs scheduled"; each run: "Notification emails processed" with sent/failed counts) |
 | Analytics jobs | `docker compose logs worker \| grep -i analytics` (startup: "Analytics jobs scheduled"). Daily totals are rebuilt at start-up and 00:30 IST; check with `docker compose exec postgres psql -U offer_platform -d offer_platform -c "select max(day) from analytics_daily"` |
 | Everyday admin work | **Use the website** (`/admin`): users and roles, categories, cities & areas, settings, activity log. The commands below are for bootstrapping and emergencies. |
-| Make someone admin | `docker compose exec api node dist/cli/grant-role.js --email <verified email> --role SUPER_ADMIN` (or `ADMIN`, or `--phone`) |
+| Make someone admin | `docker compose exec api node dist/cli/grant-role.js --email <verified email> --role SUPER_ADMIN` (or `ADMIN`, or `--phone`). They must then set up 2-step login (authenticator app) at their first admin visit |
+| Lost authenticator (emergency) | `docker compose exec api node dist/cli/reset-mfa.js --email <address>` (or `--phone`). Normally a Super admin uses "Reset 2-step login" on the user's page |
+| Retention job | `docker compose logs worker \| grep -i retention` (03:00 IST: "Retention clean-up done" with counts) |
+| Backup restore drill | `bash restore-drill.sh` (temporary database, live data untouched). Run it from the file, never piped through ssh |
 | Add areas | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "A,B"` (idempotent) |
 | Change Gmail App Password | `./set-secret.sh SMTP_PASSWORD` (hidden prompt; restarts API) |
 | Backup now / restore | `bash backup.sh` → `backups/*.dump` (nightly 02:30, 14 kept) · restore: see `docs/deployment.md` |
@@ -212,6 +216,13 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 **Accounts and login** ([docs/authentication.md](docs/authentication.md), ADR-0006 + ADR-0015):
 - **Sign up** with a 6-digit code sent to an email or phone (SMS vendor pending). The welcome screen then asks for a name and a **password**.
+- **2-step login** (Phase 8, ADR-0018, owner decision 2026-10-09):
+  - **required for every admin permission**: authenticator app (Google/Microsoft Authenticator…), 6-digit codes;
+  - the admin area shows the setup (QR code + 10 recovery codes) until it is on;
+  - logins (code, password and forgot password alike) then ask for the app code;
+  - a code works once; 5 wrong codes lock it for 15 minutes; secrets are encrypted;
+  - lost phone: a recovery code, a Super admin's "Reset 2-step login", or `admin:reset-mfa` on the server;
+  - resetting or turning it off ends admin access at once.
 - **Log in** with email/phone + password. "Log in with a code instead" stays available.
 - **Forgot password:** a code to the email/phone, then a new password. Every session ends.
 - Password rules: 8–128 characters, very common passwords and the user's own email/phone refused. Stored as Argon2id (Node built-in). 5 wrong tries lock the account for 15 minutes.
@@ -223,12 +234,13 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 **Roles** ([docs/authorization.md](docs/authorization.md)):
 - Roles: CUSTOMER, BUSINESS_OWNER, BUSINESS_STAFF, ADMIN, SUPER_ADMIN.
 - Permissions: `users:read`, `users:manage-status`, `roles:assign`, `audit:read`, `businesses:read|verify|manage`, `offers:read|moderate`, `reports:moderate`, `analytics:read`, `categories:manage`, `locations:manage`, `settings:manage`.
-- The backend always checks permissions; the website only hides buttons.
+- The backend always checks permissions; the website only hides buttons. Every permission also needs a session that passed 2-step login (`403 MFA_SETUP_REQUIRED` / `MFA_REQUIRED`).
 
 **Business lifecycle** ([docs/business-workflow.md](docs/business-workflow.md)):
 - `PENDING → (submit) UNDER_REVIEW → VERIFIED | REJECTED`; `SUSPEND` and `REACTIVATE` are available from most states.
 - No identity documents are collected (ADR-0012): a **shop photo** is required, the owner photo is optional, and the registration number is optional.
 - These requirements are an admin setting (`business.verification`).
+- `CLOSED` (Phase 8) is final: the owner deleted their account. The shop is hidden, its offers ended, the owner photo deleted; nobody can edit, suspend or reactivate it.
 - Name, phone, registration number and location **lock** while the business is under review or verified; only admins can change them then.
 
 **Offer lifecycle** ([docs/offer-workflow.md](docs/offer-workflow.md), [docs/moderation.md](docs/moderation.md)):
@@ -274,6 +286,20 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 - **Weekly summary:** Mondays 09:00 IST to every verified shop with activity or a live offer (notification type `BUSINESS_WEEKLY_SUMMARY`, inbox + email by default).
 - Charts are our own SVG/CSS (`components/charts.tsx`), no chart library.
 
+**Privacy: deletion and retention** (Phase 8, [docs/authentication.md](docs/authentication.md)):
+- **Deleting an account** erases in one transaction:
+  - name, phone, email, password, verification dates and roles;
+  - sessions, login codes, 2-step login;
+  - notifications and their settings, saves and follows;
+  - past taps stay counted without the person.
+- **Shops they own are closed** (owner decision).
+- **Nightly clean-up at 03:00 IST** (owner, "longer" option):
+  - login codes after 90 days;
+  - ended sessions 90 days after they end;
+  - notifications after 1 year;
+  - activity log after 7 years;
+  - analytics keeps its 180-day rule.
+
 **Notifications** (Phase 6, ADR-0016, [docs/api.md](docs/api.md)):
 - **Who gets what:**
   - shop: business verified / rejected / suspended / reactivated, a warning from an admin, offer approved / rejected / changes requested / suspended, offer ending within a day;
@@ -289,7 +315,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 | Area | Routes |
 |---|---|
 | Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe` |
-| Account | `/login`, `/account` (notification settings at `#notifications`) |
+| Account | `/login` (with the 2-step code step), `/account` (2-step login at `#two-step`, notification settings at `#notifications`) |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
 | Admin | `/admin` (review queues), `/admin/insights`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
@@ -345,8 +371,8 @@ Images:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 8 (security audit)** is next and needs approval.
-- Phases 8–9: see the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–7 are done.)
+- **Phase 9 (production readiness)** is next. It needs the owner decisions above, then approval.
+- See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
 - **Refresh token storage:** the token sits in `localStorage` (ADR-0014). Once web and API share a real parent domain, move it to an httpOnly cookie.
@@ -363,12 +389,18 @@ Images:
 - **No automated browser tests** for the website yet (add Playwright).
 - **Phone and email accounts can't be linked** into one account.
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
-- **Deleted accounts keep their saves and follows.** The rows point at the anonymized account and hold no personal data. Review in the Phase 8 privacy pass.
 - **Visitor counts are approximate.** A visitor who clears browser storage or switches browser counts again; someone who blocks storage gets a new id per page load.
 - **`/me/businesses/:id/engagement` taps** are all-time counts of raw events, which now cover only 180 days. The website uses the insights endpoint; mobile apps should too.
 - **Search dedupe uses IP + User-Agent** (hashed, 30 minutes in Valkey). People sharing one mobile IP and the same phone model searching the same words in 30 minutes count once.
 - **Gmail sends about 500 emails a day at most.** With no daily limit per customer, a busy day could reach it; those emails fail after 3 tries (the inbox still works). Move to a real email provider in Phase 9.
-- **Notifications are never deleted yet.** Add a retention rule (e.g. 180 days) in the Phase 8 privacy pass.
+- **Accepted risks until Phase 9** (owner, 2026-10-09; see [the audit report](docs/security-audit-2026-10-09.md)):
+  - refresh token in `localStorage`;
+  - inline styles allowed by the website CSP;
+  - API docs public on the preview;
+  - phone codes in the preview log;
+  - reports keep the reporter's note after account deletion;
+  - backups on the same disk, no alarms.
+- **Rotating `OTP_HASH_SECRET`** makes every stored authenticator secret unreadable: run `admin:reset-mfa` for each admin afterwards (ADR-0018).
 - **Domain events are in-process.** An event lost in a crash between commit and handler is not retried (ADR-0016); fine for the MVP, revisit if notifications become critical.
 
 ---
@@ -410,8 +442,11 @@ Images:
 - Drizzle `sql` templates expand a JS array into a parameter list: write `id IN ${ids}` (guard empty arrays), not `= ANY(${ids}::uuid[])`.
 - Stopping a background `next dev` task on Windows can leave Next's server process running on port 3001 in a broken state (blank pages, "Jest worker" errors). Find it with `netstat -ano | grep :3001` and stop that process.
 - Analytics days before yesterday come from `analytics_daily`. On a fresh local database, start the **worker** once (it rolls up at start-up) or the dashboards show zeros for older days.
+- Integration tests that act as an admin must use `makeAdmin(ctx, user, role)` (grants the role **and** sets up 2-step login through the API); `grantRole` alone gets `MFA_SETUP_REQUIRED`. Use `nextTotp(user)` for further codes: a code works only once.
+- In Git Bash, `node -e "..."` with backticks inside runs them as commands. Write edit scripts to a file instead (the scratchpad), as with heredocs.
 
 **Server**
+- Never pipe a script into `ssh ... bash -s` when it runs `docker compose exec`: exec reads the same input and swallows the rest of the script. Copy the file over and run it there (or add `< /dev/null`).
 - t3.micro needs the swap file to build the image.
 - `setup-server.sh` needs `.env.example` copied next to it.
 - `crontab -l` fails when no crontab exists yet; the script now tolerates that.
@@ -420,10 +455,11 @@ Images:
 
 ## 12. Document index
 
+- [docs/security-audit-2026-10-09.md](docs/security-audit-2026-10-09.md): Phase 8 audit, every finding and its status.
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0017).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0018).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -571,7 +607,15 @@ Images:
 
 **Done when:** both dashboards match the raw events in a test with known data.
 
-### Phase 8. Security audit
+### Phase 8. Security audit — ✅ Done 2026-10-09 (PR #15)
+
+> Built as approved on 2026-10-09, with the owner's choices:
+> - **authenticator-app 2-step login for admins**;
+> - **secrets rotated at launch only**;
+> - **longer retention** (codes 90 days, sessions 90 days, notifications 1 year, activity log 7 years);
+> - **shops of deleted owners closed**.
+>
+> All 6 low-risk items were accepted until Phase 9. See the [report](docs/security-audit-2026-10-09.md). The plan below is kept for history.
 
 **Goal:** find and fix weaknesses before real users arrive.
 
@@ -606,7 +650,8 @@ Images:
 | Servers | Bigger instance or a managed container service (choice recorded in an ADR); API and worker scale separately |
 | Releases | API deploys from CI on merge to `main` → staging; production deploy needs a manual approval; migrations run as a separate release step |
 | Domain and email | Real domain: website on Vercel, `api.<domain>` on AWS; email sent from the domain (provider to choose, e.g. SES) with SPF/DKIM/DMARC |
-| Login hardening | Refresh token in an httpOnly cookie on the shared parent domain (planned in ADR-0014); 2-step verification for admins if decided in Phase 8 |
+| Login hardening | Refresh token in an httpOnly cookie on the shared parent domain (planned in ADR-0014). 2-step login for admins is done (Phase 8) |
+| Secret rotation | Rotate the database password, `JWT_ACCESS_SECRET`, `OTP_HASH_SECRET` and the Gmail App Password (owner decision: at launch). After `OTP_HASH_SECRET`, run `admin:reset-mfa` for every admin so they set up 2-step login again |
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
 | Quality | Playwright browser tests in CI for the main flows; a load test of search and login |
@@ -637,6 +682,49 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-09 · PR #15 · Phase 8: security audit · Claude (AI agent), plan approved by the product owner 2026-10-09
+- **What changed:**
+  - **Report:** [docs/security-audit-2026-10-09.md](docs/security-audit-2026-10-09.md) (OWASP ASVS L2 walkthrough). 11 findings fixed, 3 owner decisions, 6 low-risk items accepted by the owner until Phase 9. No open High or Critical findings.
+  - **2-step login for admins** (ADR-0018):
+    - authenticator app (TOTP, RFC 6238, own implementation with the RFC test vectors);
+    - setup with a QR code (`qrcode` 1.5.4) and 10 recovery codes;
+    - code, password and forgot-password logins answer `{ mfaRequired, mfaToken }`, then `POST /auth/mfa/verify`;
+    - sessions carry an `mfa` flag (refresh-token column and access-token claim);
+    - every permission needs it; the guard re-checks the database, so a reset ends admin access at once;
+    - Super admin reset on the website; `admin:reset-mfa` CLI;
+    - 5 new audit actions.
+  - **Account deletion completed:** sessions, login codes, 2-step login, notifications and settings, saves and follows erased; taps unlinked; phone-verified date cleared. Owned shops get the new final status `CLOSED`: hidden, offers ended, owner photo deleted (new audit action `BUSINESS_CLOSED`).
+  - **Retention job** (worker queue `maintenance`, 03:00 IST): login codes 90 days, ended sessions 90 days, notifications 1 year, activity log 7 years.
+  - **Dependencies:** overrides for source-map-js (High) and esbuild (Moderate), both build/dev-only. `pnpm audit`: no known vulnerabilities.
+  - **Tests:** `test/security.e2e-spec.ts` walks every route (over 100): visitors 401, customers 403, admins without 2-step login `MFA_SETUP_REQUIRED`. `makeAdmin()` / `nextTotp()` helpers for admin tests.
+  - **Backups:** `deploy/staging/restore-drill.sh`; drill on the preview passed (restored in 2 s, PostGIS, 12/12 migrations, counts equal to live).
+  - **Website:**
+    - the login code step; 2-step settings on the Account page; the admin area asks for setup first;
+    - 2-step status and reset on admin user pages;
+    - activity sentences for the new actions; the "Closed" status.
+  - **Migration 0012:** `user_mfa`, `mfa_recovery_codes`, `refresh_tokens.mfa`, business status `CLOSED`.
+- **Why:** Phase 8 of the roadmap; owner decisions 2026-10-09 (authenticator app, rotate at launch, longer retention, close shops).
+- **How it was verified:**
+  - API 194 unit + 163 integration tests, web 30; lint, types and builds clean.
+  - 4 new unit tests (RFC 6238 vectors, base32, drift and reuse, encryption). 8 new integration tests:
+    - every route's access rules (2 tests);
+    - 2-step setup, the login paths, recovery codes and lockout, reset and disable;
+    - account deletion end to end;
+    - retention.
+  - Found and fixed while testing: a reset admin kept access until the access token expired (the guard now checks the database).
+  - Checks: git history scan of 40 commits (clean); live headers of API and website; restore drill on the server.
+  - Browser run against a local API:
+    - the admin area asks for 2-step setup; QR and key shown; enabled with a code; recovery codes shown once; the admin area opens;
+    - after logout, email-code login asks for the app code; a wrong code is refused; the right code opens Insights;
+    - the activity log reads "turned on 2-step login".
+- **Deploy / migration / env notes:**
+  - Migration 0012 + permission sync run on deploy; the worker restarts with the new retention job ("Maintenance jobs scheduled").
+  - **After deploy, every admin (including `offerplatform0101@gmail.com`) must set up an authenticator app at the next admin visit:** have a phone with Google or Microsoft Authenticator ready, and save the recovery codes.
+  - No new environment variables.
+- **Follow-ups:**
+  - Phase 9 (production readiness) needs the owner's decisions (domain, SMS, maps, budget, launch date) and approval.
+  - At launch: rotate secrets, then `admin:reset-mfa` for each admin.
 
 ### 2026-10-09 · PR #14 · Phase 7: analytics · Claude (AI agent), plan approved by the product owner 2026-10-08
 - **What changed:**

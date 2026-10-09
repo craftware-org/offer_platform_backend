@@ -17,6 +17,8 @@ export interface TokenPair {
 
 export interface AccessTokenPayload {
   sub: string;
+  /** The login passed the authenticator step (ADR-0018). */
+  mfa?: boolean;
 }
 
 export const invalidRefreshToken = () =>
@@ -37,21 +39,17 @@ export class TokenService {
     private readonly jwt: JwtService,
   ) {}
 
-  async issue(
-    userId: string,
-    userAgent: string | undefined,
-    db: Executor,
-    familyId = uuidv7(),
-  ): Promise<TokenPair> {
-    const { value, row } = this.newRefreshToken(userId, familyId, userAgent);
+  /** Starts a new session. `mfa`: the login passed the authenticator step (kept on every rotation). */
+  async issue(userId: string, userAgent: string | undefined, db: Executor, mfa = false): Promise<TokenPair> {
+    const { value, row } = this.newRefreshToken(userId, uuidv7(), userAgent, mfa);
     await db.insert(refreshTokens).values(row);
-    return this.pair(userId, value, row.expiresAt);
+    return this.pair(userId, value, row.expiresAt, mfa);
   }
 
   async verifyAccessToken(token: string): Promise<AccessTokenPayload | null> {
     try {
       const payload = await this.jwt.verifyAsync<Partial<AccessTokenPayload>>(token);
-      return typeof payload.sub === 'string' ? { sub: payload.sub } : null;
+      return typeof payload.sub === 'string' ? { sub: payload.sub, mfa: payload.mfa === true } : null;
     } catch {
       return null;
     }
@@ -94,7 +92,7 @@ export class TokenService {
         .returning({ id: refreshTokens.id });
       if (!claimed) return { kind: 'reused', userId: current.userId, familyId: current.familyId } as const;
 
-      const next = this.newRefreshToken(current.userId, current.familyId, userAgent);
+      const next = this.newRefreshToken(current.userId, current.familyId, userAgent, current.mfa);
       await tx.insert(refreshTokens).values(next.row);
       await tx
         .update(refreshTokens)
@@ -103,7 +101,7 @@ export class TokenService {
       return {
         kind: 'rotated',
         userId: current.userId,
-        tokens: await this.pair(current.userId, next.value, next.row.expiresAt),
+        tokens: await this.pair(current.userId, next.value, next.row.expiresAt, current.mfa),
       } as const;
     });
   }
@@ -132,7 +130,7 @@ export class TokenService {
       .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
   }
 
-  private newRefreshToken(userId: string, familyId: string, userAgent: string | undefined) {
+  private newRefreshToken(userId: string, familyId: string, userAgent: string | undefined, mfa: boolean) {
     const value = randomBytes(32).toString('base64url');
     const row = {
       id: uuidv7(),
@@ -141,12 +139,18 @@ export class TokenService {
       tokenHash: sha256(value),
       expiresAt: new Date(Date.now() + this.config.REFRESH_TOKEN_TTL_DAYS * 86_400_000),
       userAgent: userAgent?.slice(0, 255) ?? null,
+      mfa,
     };
     return { value, row };
   }
 
-  private async pair(userId: string, refreshToken: string, refreshTokenExpiresAt: Date): Promise<TokenPair> {
-    const payload: AccessTokenPayload = { sub: userId };
+  private async pair(
+    userId: string,
+    refreshToken: string,
+    refreshTokenExpiresAt: Date,
+    mfa: boolean,
+  ): Promise<TokenPair> {
+    const payload: AccessTokenPayload = mfa ? { sub: userId, mfa: true } : { sub: userId };
     return {
       accessToken: await this.jwt.signAsync(payload),
       accessTokenExpiresIn: this.config.JWT_ACCESS_TTL_SECONDS,

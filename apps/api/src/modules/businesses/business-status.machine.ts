@@ -10,6 +10,8 @@ import type { BusinessStatus } from './businesses.schema.js';
  *      └──(owner edits)── REJECTED ◀──REJECT──┘   REJECTED ──SUBMIT──▶ UNDER_REVIEW
  *
  *   any state except SUSPENDED ──SUSPEND──▶ SUSPENDED ──REACTIVATE──▶ VERIFIED (if it was verified) or PENDING
+ *
+ *   CLOSED is final: set when the owner deletes their account (no action leads out of it).
  */
 export type BusinessAction = 'SUBMIT' | 'VERIFY' | 'REJECT' | 'SUSPEND' | 'REACTIVATE';
 
@@ -50,6 +52,9 @@ export function nextBusinessStatus(
 /** Details an admin checked during verification. The owner cannot change them while under review or verified. */
 export const LOCKED_FIELDS = ['name', 'registrationNumber', 'phone', 'location'] as const;
 export type LockedField = (typeof LOCKED_FIELDS)[number];
+
+/** Nobody but the platform can change a suspended or closed business. */
+export const isFrozen = (status: BusinessStatus) => status === 'SUSPENDED' || status === 'CLOSED';
 
 export const isLockedForOwner = (status: BusinessStatus) =>
   status === 'UNDER_REVIEW' || status === 'VERIFIED';

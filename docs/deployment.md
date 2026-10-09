@@ -63,6 +63,8 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 | Preview login code (phone) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
 | Backup now | `bash backup.sh` → `backups/*.dump` |
 | Restore | `docker compose exec -T postgres pg_restore -U offer_platform -d offer_platform --clean < backups/<file>.dump` |
+| Restore drill (safe; live data untouched) | `bash restore-drill.sh`: restores the newest backup into a temporary database, checks PostGIS, migrations and row counts, then drops it. Run it from the file, not piped through ssh. Last run: 2026-10-09, passed |
+| Lost authenticator (emergency) | `docker compose exec api node dist/cli/reset-mfa.js --email <address>` (or `--phone`): clears that person's 2-step login and ends their sessions (ADR-0018). Normally a Super admin does this on the website |
 | Add areas (localities) | `docker compose exec api node dist/cli/add-localities.js --city hubballi --names "Area One,Area Two"` (idempotent) |
 | First super admin | `docker compose exec api node dist/cli/grant-role.js --email <address> --role SUPER_ADMIN` (or `--phone <number>`), after that person has logged in once |
 

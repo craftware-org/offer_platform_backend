@@ -7,6 +7,8 @@ export interface Principal {
   status: UserStatus;
   roles: string[];
   permissions: ReadonlySet<string>;
+  /** This session passed the authenticator step (ADR-0018). Required for every admin permission. */
+  mfa?: boolean;
 }
 
 /** `id` is assigned by requestIdMiddleware before anything else runs. */

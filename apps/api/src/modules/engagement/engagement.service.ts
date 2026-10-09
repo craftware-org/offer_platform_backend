@@ -5,7 +5,7 @@ import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { Page, type PageQuery } from '../../common/http/pagination.js';
 import { hashIp, isLikelyBot } from '../../common/http/visitors.js';
 import { APP_CONFIG, type AppConfig } from '../../config/config.module.js';
-import { DB, type Database } from '../../infrastructure/database/database.module.js';
+import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { RateLimiterService } from '../../infrastructure/redis/rate-limiter.service.js';
 import { REDIS } from '../../infrastructure/redis/redis.token.js';
 import { BusinessesService } from '../businesses/businesses.service.js';
@@ -88,7 +88,14 @@ const EVENT_FIELD: Partial<Record<AnalyticsEventType, keyof EngagementCounts>> =
   WEBSITE_CLICKED: 'website',
   DIRECTIONS_CLICKED: 'directions',
 };
-const emptyCounts = (): EngagementCounts => ({ saves: 0, shares: 0, calls: 0, whatsapp: 0, website: 0, directions: 0 });
+const emptyCounts = (): EngagementCounts => ({
+  saves: 0,
+  shares: 0,
+  calls: 0,
+  whatsapp: 0,
+  website: 0,
+  directions: 0,
+});
 
 /**
  * Customer engagement (Phase 5, spec §23–26, §30): saved offers, followed businesses and the
@@ -123,7 +130,9 @@ export class EngagementService {
   }
 
   async unsave(userId: string, offerId: string): Promise<void> {
-    await this.db.delete(savedOffers).where(and(eq(savedOffers.userId, userId), eq(savedOffers.offerId, offerId)));
+    await this.db
+      .delete(savedOffers)
+      .where(and(eq(savedOffers.userId, userId), eq(savedOffers.offerId, offerId)));
   }
 
   async savedIds(userId: string): Promise<string[]> {
@@ -140,7 +149,11 @@ export class EngagementService {
    * Saved offers that are still visible. "active" = live or paused; "ended" = expired (spec §23:
    * expired offers must not appear among active saved results). Suspended or hidden ones are skipped.
    */
-  async listSaved(userId: string, status: 'active' | 'ended', query: PageQuery): Promise<Page<SavedOfferView>> {
+  async listSaved(
+    userId: string,
+    status: 'active' | 'ended',
+    query: PageQuery,
+  ): Promise<Page<SavedOfferView>> {
     const rows = await this.db
       .select({ offerId: savedOffers.offerId, savedAt: savedOffers.createdAt })
       .from(savedOffers)
@@ -149,7 +162,9 @@ export class EngagementService {
       .limit(SAVED_LIST_CAP);
     const savedAt = new Map(rows.map((r) => [r.offerId, r.savedAt]));
     const views = await this.offers.visibleByIds(rows.map((r) => r.offerId));
-    const wanted = views.filter((v) => (status === 'ended' ? v.availability === 'EXPIRED' : v.availability !== 'EXPIRED'));
+    const wanted = views.filter((v) =>
+      status === 'ended' ? v.availability === 'EXPIRED' : v.availability !== 'EXPIRED',
+    );
     const start = (query.page - 1) * query.pageSize;
     return new Page(
       wanted.slice(start, start + query.pageSize).map((v) => ({ ...v, savedAt: savedAt.get(v.id)! })),
@@ -225,7 +240,11 @@ export class EngagementService {
    * by the shop's own staff and by admins. Views never store who viewed (ADR-0017).
    * Always succeeds silently for skipped events, so the website never needs to care.
    */
-  async track(actor: Actor, type: TrackableEvent, target: { offerId?: string; businessId?: string }): Promise<void> {
+  async track(
+    actor: Actor,
+    type: TrackableEvent,
+    target: { offerId?: string; businessId?: string },
+  ): Promise<void> {
     const who = actor.userId ? `u:${actor.userId}` : actor.visitorId ? `v:${actor.visitorId}` : null;
     if (!who) throw AppError.validation({ visitorId: 'A visitor id is required when not logged in' });
     await this.rateLimiter.consume(`evt:${who}`, EVENTS_PER_USER_PER_HOUR, 3600);
@@ -253,10 +272,20 @@ export class EngagementService {
       if ((await this.businesses.memberUserIds(businessId)).includes(actor.userId)) return;
     }
 
-    const first = await this.redis.set(`evt:dedupe:${who}:${type}:${offerId ?? businessId}`, '1', 'EX', DEDUPE_SECONDS, 'NX');
+    const first = await this.redis.set(
+      `evt:dedupe:${who}:${type}:${offerId ?? businessId}`,
+      '1',
+      'EX',
+      DEDUPE_SECONDS,
+      'NX',
+    );
     if (!first) return;
     if (!actor.userId) {
-      const perIp = await this.rateLimiter.hit(`evt:ip:${hashIp(actor.ip, this.config.OTP_HASH_SECRET)}`, ANONYMOUS_EVENTS_PER_IP_PER_HOUR, 3600);
+      const perIp = await this.rateLimiter.hit(
+        `evt:ip:${hashIp(actor.ip, this.config.OTP_HASH_SECRET)}`,
+        ANONYMOUS_EVENTS_PER_IP_PER_HOUR,
+        3600,
+      );
       if (!perIp.allowed) return;
     }
     await this.record(type, businessId, offerId, isView ? null : (actor.userId ?? null));
@@ -269,6 +298,18 @@ export class EngagementService {
       .where(lt(analyticsEvents.createdAt, cutoff))
       .returning({ id: analyticsEvents.id });
     return deleted.length;
+  }
+
+  // ---- Personal data (Phase 8) ---------------------------------------------------------------
+
+  /**
+   * Account deletion: saves and follows go (shop totals drop accordingly), and past taps keep
+   * counting but are no longer linked to the person.
+   */
+  async forgetUser(userId: string, tx: Executor): Promise<void> {
+    await tx.delete(savedOffers).where(eq(savedOffers.userId, userId));
+    await tx.delete(businessFollowers).where(eq(businessFollowers.userId, userId));
+    await tx.update(analyticsEvents).set({ userId: null }).where(eq(analyticsEvents.userId, userId));
   }
 
   // ---- Business dashboard ------------------------------------------------------------------------
@@ -317,7 +358,12 @@ export class EngagementService {
     return { followers: followers?.value ?? 0, totals, offers };
   }
 
-  private async record(type: AnalyticsEventType, businessId: string, offerId: string | null, userId: string | null) {
+  private async record(
+    type: AnalyticsEventType,
+    businessId: string,
+    offerId: string | null,
+    userId: string | null,
+  ) {
     await this.db.insert(analyticsEvents).values({ type, businessId, offerId, userId });
   }
 }

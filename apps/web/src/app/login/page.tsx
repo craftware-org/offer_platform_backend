@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import type { LoginResult } from '@/lib/types';
+import { needsMfa, type LoginOutcome, type LoginResult } from '@/lib/types';
 
 export default function LoginPage() {
   return (
@@ -37,6 +37,8 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  /** Set when the password/code step passed but 2-step login is on: the authenticator step follows. */
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
   // Set while this page logs someone in: it does its own redirect (new users go to the welcome step).
   const loggingIn = useRef(false);
 
@@ -73,7 +75,11 @@ function Login() {
     }
   }
 
-  async function finish(result: LoginResult) {
+  async function finish(result: LoginOutcome) {
+    if (needsMfa(result)) {
+      setMfaToken(result.mfaToken);
+      return;
+    }
     await signIn(result);
     // New accounts, and accounts that never set a password, choose one (and a name) first.
     const needsSetup = !result.user.hasPassword || (result.isNewUser && !result.user.name);
@@ -94,7 +100,7 @@ function Login() {
   const loginWithPassword = () =>
     run(async () => {
       loggingIn.current = true;
-      const result = await api<LoginResult>('/auth/password/login', {
+      const result = await api<LoginOutcome>('/auth/password/login', {
         method: 'POST',
         auth: false,
         body: { ...idBody(), password },
@@ -105,7 +111,7 @@ function Login() {
   const loginWithCode = () =>
     run(async () => {
       loggingIn.current = true;
-      const result = await api<LoginResult>('/auth/otp/verify', {
+      const result = await api<LoginOutcome>('/auth/otp/verify', {
         method: 'POST',
         auth: false,
         body: { ...idBody(), code: code.trim() },
@@ -116,13 +122,35 @@ function Login() {
   const resetPassword = () =>
     run(async () => {
       loggingIn.current = true;
-      const result = await api<LoginResult>('/auth/password/reset', {
+      const result = await api<LoginOutcome>('/auth/password/reset', {
         method: 'POST',
         auth: false,
         body: { ...idBody(), code: code.trim(), newPassword },
       });
       await finish(result);
     });
+
+  const verifyMfa = (answer: { code: string } | { recoveryCode: string }) =>
+    run(async () => {
+      loggingIn.current = true;
+      const result = await api<LoginResult>('/auth/mfa/verify', { method: 'POST', auth: false, body: { mfaToken, ...answer } });
+      await finish(result);
+    });
+
+  if (mfaToken) {
+    return (
+      <MfaStep
+        busy={busy}
+        error={error}
+        onSubmit={verifyMfa}
+        onCancel={() => {
+          loggingIn.current = false;
+          setMfaToken(null);
+          setError(null);
+        }}
+      />
+    );
+  }
 
   const title = mode === 'reset' ? 'Reset your password' : mode === 'code' ? 'Log in or sign up with a code' : 'Log in';
 
@@ -298,5 +326,70 @@ function Login() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
+  );
+}
+
+/** Second login step for accounts with 2-step login on (ADR-0018). */
+function MfaStep({
+  busy,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  busy: boolean;
+  error: string | null;
+  onSubmit: (answer: { code: string } | { recoveryCode: string }) => void;
+  onCancel: () => void;
+}) {
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [value, setValue] = useState('');
+  return (
+    <form
+      className="card mx-auto max-w-md space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(useRecovery ? { recoveryCode: value.trim() } : { code: value.trim() });
+      }}
+    >
+      <h1 className="text-xl font-semibold">2-step login</h1>
+      <p className="text-sm text-gray-600">
+        {useRecovery
+          ? 'Enter one of the recovery codes you saved when you set up 2-step login. Each code works once.'
+          : 'Open your authenticator app and enter the 6-digit code for this account.'}
+      </p>
+      <div>
+        <label className="label" htmlFor="mfa-code">
+          {useRecovery ? 'Recovery code' : 'Authenticator code'}
+        </label>
+        <input
+          id="mfa-code"
+          className="input"
+          autoComplete="one-time-code"
+          inputMode={useRecovery ? 'text' : 'numeric'}
+          maxLength={useRecovery ? 20 : 6}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button className="btn-primary w-full" disabled={busy || (useRecovery ? value.trim().length < 8 : !/^\d{6}$/.test(value.trim()))}>
+        {busy ? 'Checking…' : 'Continue'}
+      </button>
+      <div className="flex justify-between text-sm">
+        <button
+          type="button"
+          className="text-brand-700 underline"
+          onClick={() => {
+            setUseRecovery((r) => !r);
+            setValue('');
+          }}
+        >
+          {useRecovery ? 'Use the authenticator app' : 'Lost your phone? Use a recovery code'}
+        </button>
+        <button type="button" className="text-gray-600 underline" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

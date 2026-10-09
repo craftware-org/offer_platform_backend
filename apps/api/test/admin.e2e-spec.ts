@@ -1,6 +1,13 @@
 import { Role } from '../src/modules/access-control/access-control.catalog.js';
 import { AccessControlService } from '../src/modules/access-control/access-control.service.js';
-import { bearer, createTestApp, login, type LoggedIn, type TestContext } from './helpers/test-app.js';
+import {
+  makeAdmin,
+  bearer,
+  createTestApp,
+  login,
+  type LoggedIn,
+  type TestContext,
+} from './helpers/test-app.js';
 
 describe('Admin: users, roles and audit — real Postgres + Valkey', () => {
   let ctx: TestContext;
@@ -8,14 +15,14 @@ describe('Admin: users, roles and audit — real Postgres + Valkey', () => {
   let admin: LoggedIn;
   let customer: LoggedIn;
 
-  const grant = (userId: string, role: Role) =>
-    ctx.app.get(AccessControlService).grantRole(userId, role, null);
+  /** Admin role plus 2-step login, as every admin needs (ADR-0018). */
+  const grant = (user: LoggedIn, role: Role) => makeAdmin(ctx, user, role);
 
   beforeAll(async () => {
     ctx = await createTestApp();
     [superAdmin, admin, customer] = [await login(ctx), await login(ctx), await login(ctx)];
-    await grant(superAdmin.userId, Role.SUPER_ADMIN);
-    await grant(admin.userId, Role.ADMIN);
+    await grant(superAdmin, Role.SUPER_ADMIN);
+    await grant(admin, Role.ADMIN);
   });
   afterAll(async () => {
     await ctx.close();
@@ -41,10 +48,14 @@ describe('Admin: users, roles and audit — real Postgres + Valkey', () => {
         .expect(403);
     });
 
-    it('permission changes apply immediately to existing tokens', async () => {
+    it('a new role applies to existing tokens at once, but admin work needs 2-step login first', async () => {
       const user = await login(ctx);
-      await ctx.http().get('/api/v1/admin/users').set(bearer(user.accessToken)).expect(403);
-      await grant(user.userId, Role.ADMIN);
+      const before = await ctx.http().get('/api/v1/admin/users').set(bearer(user.accessToken)).expect(403);
+      expect(before.body.error.code).toBe('FORBIDDEN');
+      await ctx.app.get(AccessControlService).grantRole(user.userId, Role.ADMIN, null);
+      const noMfa = await ctx.http().get('/api/v1/admin/users').set(bearer(user.accessToken)).expect(403);
+      expect(noMfa.body.error.code).toBe('MFA_SETUP_REQUIRED');
+      await grant(user, Role.ADMIN); // sets up the authenticator; the new session passed the step
       await ctx.http().get('/api/v1/admin/users').set(bearer(user.accessToken)).expect(200);
     });
   });

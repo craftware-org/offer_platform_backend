@@ -29,6 +29,8 @@ Three global guards run in order on every request:
 
 Secure by default: a new endpoint without `@Public()` requires login.
 
+**2-step login for admin permissions (Phase 8, ADR-0018):** the permissions guard also requires that the session passed the authenticator step, and checks the database, so a reset takes effect at once. Without it: `403 MFA_SETUP_REQUIRED` or `MFA_REQUIRED`. A test in `test/security.e2e-spec.ts` walks **every** route and checks that visitors get 401, customers get 403 on admin routes, and admins without 2-step login get `MFA_SETUP_REQUIRED`. New routes are covered automatically.
+
 ## Rules
 
 - Every registered user has `CUSTOMER`.

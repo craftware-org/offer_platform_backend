@@ -3,12 +3,18 @@ import { NestFactory } from '@nestjs/core';
 import { eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
 import { Role } from '../src/modules/access-control/access-control.catalog.js';
-import { AccessControlService } from '../src/modules/access-control/access-control.service.js';
 import { auditLogs } from '../src/modules/audit/audit.schema.js';
 import { OfferLifecycleService } from '../src/modules/offers/offer-lifecycle.service.js';
 import { offers } from '../src/modules/offers/offers.schema.js';
 import { WorkerModule } from '../src/worker.module.js';
-import { bearer, createTestApp, login, type LoggedIn, type TestContext } from './helpers/test-app.js';
+import {
+  makeAdmin,
+  bearer,
+  createTestApp,
+  login,
+  type LoggedIn,
+  type TestContext,
+} from './helpers/test-app.js';
 
 const HUBBALLI_PIN = { latitude: 15.3602, longitude: 75.1301 };
 const hoursFromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
@@ -29,8 +35,8 @@ describe('Offers: create → review → live → expire (real Postgres/PostGIS +
   let fashionId: string;
   let foodId: string;
 
-  const grant = (userId: string, role: Role) =>
-    ctx.app.get(AccessControlService).grantRole(userId, role, null);
+  /** Admin role plus 2-step login, as every admin needs (ADR-0018). */
+  const grant = (user: LoggedIn, role: Role) => makeAdmin(ctx, user, role);
   const lifecycle = () => new OfferLifecycleService(ctx.db, ctx.app.get(DomainEvents));
 
   /** Registers a business and takes it through verification (verified by `verifier`). */
@@ -107,8 +113,8 @@ describe('Offers: create → review → live → expire (real Postgres/PostGIS +
       await login(ctx),
       await login(ctx),
     ];
-    await grant(admin.userId, Role.ADMIN);
-    await grant(superAdmin.userId, Role.SUPER_ADMIN);
+    await grant(admin, Role.ADMIN);
+    await grant(superAdmin, Role.SUPER_ADMIN);
 
     const cities = await ctx.http().get('/api/v1/cities').expect(200);
     hubballiId = cities.body.data.find((c: { slug: string }) => c.slug === 'hubballi').id;

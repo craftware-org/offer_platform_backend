@@ -14,7 +14,7 @@ import { CategoriesService } from '../categories/categories.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import type { CreateBusinessInput, UpdateBusinessInput } from './business.dto.js';
 import { BusinessReader } from './business-reader.js';
-import { isLockedForOwner, LOCKED_FIELDS, nextBusinessStatus } from './business-status.machine.js';
+import { isFrozen, isLockedForOwner, LOCKED_FIELDS, nextBusinessStatus } from './business-status.machine.js';
 import {
   toOwnerView,
   toPublicView,
@@ -140,7 +140,10 @@ export class BusinessesService {
     await this.withSlugRetry(() =>
       this.db.transaction(async (tx) => {
         const business = await this.reader.findManaged(userId, businessId, tx);
-        if (business.status === 'SUSPENDED') throw AppError.forbidden('This business is suspended');
+        if (isFrozen(business.status))
+          throw AppError.forbidden(
+            `This business is ${business.status === 'CLOSED' ? 'closed' : 'suspended'}`,
+          );
         if (isLockedForOwner(business.status)) {
           const touched = LOCKED_FIELDS.filter((f) => patch[f] !== undefined);
           if (touched.length > 0) {
@@ -397,5 +400,46 @@ export class BusinessesService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Account deletion (owner decision 2026-10-09): every business this person owns is closed (hidden,
+   * kept for history), and they stop being staff anywhere. Returns the closed business ids so the
+   * caller can end their offers and delete the owner photos.
+   */
+  async closeOwnedBy(userId: string, tx: Executor, requestId?: string): Promise<string[]> {
+    const owned = await tx
+      .select({ id: businessStaff.businessId })
+      .from(businessStaff)
+      .innerJoin(businesses, eq(businesses.id, businessStaff.businessId))
+      .where(
+        and(
+          eq(businessStaff.userId, userId),
+          eq(businessStaff.role, 'OWNER'),
+          ne(businesses.status, 'CLOSED'),
+        ),
+      );
+    const ids = owned.map((o) => o.id);
+    if (ids.length > 0) {
+      await tx
+        .update(businesses)
+        .set({ status: 'CLOSED', statusReason: 'The owner deleted their account' })
+        .where(inArray(businesses.id, ids));
+      for (const id of ids) {
+        await this.audit.record(
+          {
+            actorUserId: userId,
+            action: AuditAction.BUSINESS_CLOSED,
+            entityType: 'business',
+            entityId: id,
+            newValue: { status: 'CLOSED' },
+            requestId,
+          },
+          tx,
+        );
+      }
+    }
+    await tx.delete(businessStaff).where(eq(businessStaff.userId, userId));
+    return ids;
   }
 }

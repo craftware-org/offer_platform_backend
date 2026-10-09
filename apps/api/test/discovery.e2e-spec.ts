@@ -1,9 +1,15 @@
 import { eq } from 'drizzle-orm';
 import { Role } from '../src/modules/access-control/access-control.catalog.js';
 import { offers } from '../src/modules/offers/offers.schema.js';
-import { AccessControlService } from '../src/modules/access-control/access-control.service.js';
 import { approvedOffer, hoursFromNow, loadRefs, verifiedBusiness, type Refs } from './helpers/fixtures.js';
-import { bearer, createTestApp, login, type LoggedIn, type TestContext } from './helpers/test-app.js';
+import {
+  makeAdmin,
+  bearer,
+  createTestApp,
+  login,
+  type LoggedIn,
+  type TestContext,
+} from './helpers/test-app.js';
 
 // Real coordinates: Hubballi centre area, ~3 km north-west of it, and Dharwad (~16 km away).
 const HUBBALLI = { latitude: 15.3602, longitude: 75.1301 };
@@ -29,7 +35,7 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
   beforeAll(async () => {
     ctx = await createTestApp();
     admin = await login(ctx);
-    await ctx.app.get(AccessControlService).grantRole(admin.userId, Role.ADMIN, null);
+    await makeAdmin(ctx, admin, Role.ADMIN);
     refs = await loadRefs(ctx);
     const hubballi = refs.cityId('hubballi');
 

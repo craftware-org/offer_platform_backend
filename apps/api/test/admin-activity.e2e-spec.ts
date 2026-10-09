@@ -1,7 +1,13 @@
 import { Role } from '../src/modules/access-control/access-control.catalog.js';
-import { AccessControlService } from '../src/modules/access-control/access-control.service.js';
 import { loadRefs, verifiedBusiness } from './helpers/fixtures.js';
-import { bearer, createTestApp, login, type LoggedIn, type TestContext } from './helpers/test-app.js';
+import {
+  makeAdmin,
+  bearer,
+  createTestApp,
+  login,
+  type LoggedIn,
+  type TestContext,
+} from './helpers/test-app.js';
 
 interface Entry {
   action: string;
@@ -20,16 +26,21 @@ describe('Admin activity feed (audit with names) — real Postgres + Valkey', ()
   beforeAll(async () => {
     ctx = await createTestApp();
     [admin, owner, customer] = [await login(ctx), await login(ctx), await login(ctx)];
-    await ctx.app.get(AccessControlService).grantRole(admin.userId, Role.ADMIN, null);
-    await ctx.http().patch('/api/v1/users/me').set(bearer(admin.accessToken)).send({ name: 'Ravi Admin' }).expect(200);
+    await makeAdmin(ctx, admin, Role.ADMIN);
+    await ctx
+      .http()
+      .patch('/api/v1/users/me')
+      .set(bearer(admin.accessToken))
+      .send({ name: 'Ravi Admin' })
+      .expect(200);
   });
   afterAll(async () => {
     await ctx.close();
   });
 
   const feed = async (query: Record<string, string> = {}) =>
-    (await ctx.http().get('/api/v1/admin/activity').query(query).set(bearer(admin.accessToken)).expect(200)).body
-      .data as Entry[];
+    (await ctx.http().get('/api/v1/admin/activity').query(query).set(bearer(admin.accessToken)).expect(200))
+      .body.data as Entry[];
 
   it('shows who did what to which item, by name', async () => {
     const refs = await loadRefs(ctx);
@@ -53,7 +64,10 @@ describe('Admin activity feed (audit with names) — real Postgres + Valkey', ()
   });
 
   it('labels areas with their city and settings with their key', async () => {
-    const cities = (await ctx.http().get('/api/v1/cities').expect(200)).body.data as { id: string; slug: string }[];
+    const cities = (await ctx.http().get('/api/v1/cities').expect(200)).body.data as {
+      id: string;
+      slug: string;
+    }[];
     const dharwad = cities.find((c) => c.slug === 'dharwad')!;
     const created = await ctx
       .http()
