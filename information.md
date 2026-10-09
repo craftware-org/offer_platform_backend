@@ -568,7 +568,7 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | 6 | **Notifications:** 🔔 inbox + email; shop, customer and admin messages; per-type preferences; quiet hours; one-click unsubscribe | ✅ Done 2026-10-08 (push later with the mobile apps) | — |
 | 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
 | 8 | **Security audit:** ASVS L2 review ([report](docs/security-audit-2026-10-09.md)), admin 2-step login, every-route permission test, complete account deletion, retention clean-up, dependency fixes, backup restore drill | ✅ Done 2026-10-09 (secrets rotate at launch) | — |
-| 9 | **Production readiness (in progress; automatic deploys and monitoring done):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
+| 9 | **Production readiness (in progress; automatic deploys, monitoring and browser tests done):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
 | Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
@@ -658,7 +658,7 @@ Legend:
 
 **Tests today:**
 - API: 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
-- Website: 30 unit tests.
+- Website: 30 unit tests, and 11 browser tests (Playwright, desktop and phone) of the MVP path, run in CI on every pull request.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
 **Browser runs (by hand, against a local API and database):**

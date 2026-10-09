@@ -54,12 +54,94 @@ jobs:
           name: openapi
           path: apps/api/openapi.json
 
+  # Phase 9: the main flows in a real browser (Playwright) against the real API, worker and website
+  # on a throwaway PostGIS + Valkey. Login codes come from the API log (console providers; never
+  # in production).
+  e2e:
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: offer_platform
+          POSTGRES_PASSWORD: e2e-only
+          POSTGRES_DB: offer_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U offer_platform" --health-interval 5s --health-timeout 5s --health-retries 30
+      valkey:
+        image: valkey/valkey:8.0-alpine
+        ports: ['6379:6379']
+    env:
+      NODE_ENV: development
+      DATABASE_URL: postgres://offer_platform:e2e-only@localhost:5432/offer_platform
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: e2e-placeholder-not-a-secret-000000000000
+      OTP_HASH_SECRET: e2e-placeholder-not-a-secret-111111111111
+      CORS_ORIGINS: http://localhost:3001
+      # Every browser in the test shares one IP address.
+      RATE_LIMIT_PER_IP_PER_MINUTE: 5000
+      STORAGE_LOCAL_DIR: /tmp/e2e-storage
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: 1
+      E2E_API_LOG: ${{ github.workspace }}/apps/api/api.log
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build API and website
+        run: pnpm turbo run build --filter=@offer-platform/api --filter=@offer-platform/web
+
+      - name: Database (migrations + roles)
+        working-directory: apps/api
+        run: node dist/cli/migrate.js && node dist/cli/seed.js
+
+      - name: Start API, worker and website
+        run: |
+          (cd apps/api && nohup node dist/main.js > api.log 2>&1 &)
+          (cd apps/api && nohup node dist/worker.js > worker.log 2>&1 &)
+          (cd apps/web && nohup pnpm exec next start -p 3001 > web.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/api/v1/health/ready >/dev/null 2>&1 && curl -fsS -o /dev/null http://localhost:3001/ && exit 0
+            sleep 2
+          done
+          echo "Servers did not start"; tail -50 apps/api/api.log apps/web/web.log; exit 1
+
+      - name: Install Chromium
+        run: pnpm --filter @offer-platform/web exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: pnpm --filter @offer-platform/web test:e2e
+
+      - name: Keep the report, traces and logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            apps/api/api.log
+            apps/api/worker.log
+            apps/web/web.log
+          retention-days: 7
+
   # Phase 9: every green push to main deploys the API to the preview server (the website deploys
   # itself through Vercel). The SSH key is a dedicated, restricted deploy key stored as the GitHub
   # secret STAGING_SSH_KEY by the owner; the server's host key is pinned below.
   deploy-staging:
     name: Deploy API to the preview server
-    needs: [api]
+    needs: [api, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
