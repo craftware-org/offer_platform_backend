@@ -78,11 +78,20 @@ export class UsersService {
   async labelsFor(ids: string[]): Promise<Map<string, string>> {
     if (ids.length === 0) return new Map();
     const rows = await this.db
-      .select({ id: users.id, name: users.name, email: users.email, phone: users.phone, status: users.status })
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        status: users.status,
+      })
       .from(users)
       .where(inArray(users.id, ids));
     return new Map(
-      rows.map((r) => [r.id, r.status === 'DELETED' ? 'Deleted user' : (r.name ?? r.email ?? r.phone ?? 'User')]),
+      rows.map((r) => [
+        r.id,
+        r.status === 'DELETED' ? 'Deleted user' : (r.name ?? r.email ?? r.phone ?? 'User'),
+      ]),
     );
   }
 
@@ -244,6 +253,7 @@ export class UsersService {
       .update(users)
       .set({
         phone: null,
+        phoneVerifiedAt: null,
         name: null,
         email: null,
         emailVerifiedAt: null,

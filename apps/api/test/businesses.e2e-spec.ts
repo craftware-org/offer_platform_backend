@@ -1,7 +1,13 @@
 import sharp from 'sharp';
 import { Role } from '../src/modules/access-control/access-control.catalog.js';
-import { AccessControlService } from '../src/modules/access-control/access-control.service.js';
-import { bearer, createTestApp, login, type LoggedIn, type TestContext } from './helpers/test-app.js';
+import {
+  makeAdmin,
+  bearer,
+  createTestApp,
+  login,
+  type LoggedIn,
+  type TestContext,
+} from './helpers/test-app.js';
 
 // Near Hubballi city centre (15.3647, 75.1240); Bengaluru is far outside the service radius.
 const HUBBALLI_PIN = { latitude: 15.3602, longitude: 75.1301 };
@@ -23,8 +29,8 @@ describe('Businesses: registration → verification → public profile (real Pos
   let dharwadId: string;
   let fashionId: string;
 
-  const grant = (userId: string, role: Role) =>
-    ctx.app.get(AccessControlService).grantRole(userId, role, null);
+  /** Admin role plus 2-step login, as every admin needs (ADR-0018). */
+  const grant = (user: LoggedIn, role: Role) => makeAdmin(ctx, user, role);
 
   /** Reads a binary response body (images) as a Buffer. */
   const getBinary = (path: string, headers: Record<string, string> = {}) =>
@@ -81,8 +87,8 @@ describe('Businesses: registration → verification → public profile (real Pos
       await login(ctx),
       await login(ctx),
     ];
-    await grant(admin.userId, Role.ADMIN);
-    await grant(superAdmin.userId, Role.SUPER_ADMIN);
+    await grant(admin, Role.ADMIN);
+    await grant(superAdmin, Role.SUPER_ADMIN);
 
     const cities = await ctx.http().get('/api/v1/cities').expect(200);
     hubballiId = cities.body.data.find((c: { slug: string }) => c.slug === 'hubballi').id;

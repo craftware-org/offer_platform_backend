@@ -187,6 +187,25 @@ Design: [ADR-0017](adr/0017-analytics-counting-rollups-and-charts.md). Days are 
 
 `GET /discover/offers` also records the search (typed words, first page only, once per visitor per 30 minutes, bots skipped) for the admin dashboard. Nothing changes in its response.
 
+## Endpoints (Phase 8): 2-step login
+
+Design: [ADR-0018](adr/0018-admin-two-step-login-with-authenticator-app.md).
+- **Login answers:** `POST /auth/otp/verify`, `/auth/password/login` and `/auth/password/reset` now answer either the usual tokens or `{ mfaRequired: true, mfaToken, mfaTokenExpiresIn }`.
+- **Admin routes:** every route that needs a permission also needs 2-step login; without it they answer `403 MFA_SETUP_REQUIRED` or `403 MFA_REQUIRED`.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/auth/mfa/verify` | public | `{mfaToken, code}` or `{mfaToken, recoveryCode}` → the usual login result. Wrong code: `401 MFA_INVALID`; 5 wrong codes lock it for 15 minutes (`429`) |
+| GET | `/me/mfa` | user | `{enabled, enabledAt, recoveryCodesLeft}` |
+| POST | `/me/mfa/setup` | user | `{secret, otpauthUrl, qrDataUrl}`; valid 10 minutes; `409` if already on |
+| POST | `/me/mfa/enable` | user | `{code}` → `{recoveryCodes (10, shown once), tokens}`; every other session ends |
+| POST | `/me/mfa/recovery-codes` | user | `{code}` → `{recoveryCodes}` (the old ones stop working) |
+| POST | `/me/mfa/disable` | user | `{code}`; 204; ends every session |
+| GET | `/admin/users/:id/mfa` | `users:read` | `{enabled, enabledAt}` |
+| POST | `/admin/users/:id/mfa/reset` | `roles:assign` | Clears their authenticator and recovery codes; ends their sessions; 204; audited |
+
+Business status `CLOSED` (Phase 8) is final: the owner deleted their account. Closed shops are hidden everywhere and admins can't suspend or reactivate them (409).
+
 ### `GET /discover/offers`
 
 | Parameter | Meaning |

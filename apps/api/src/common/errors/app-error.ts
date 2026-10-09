@@ -18,6 +18,11 @@ export const ErrorCode = {
   OTP_ATTEMPTS_EXCEEDED: 'OTP_ATTEMPTS_EXCEEDED',
   INVALID_REFRESH_TOKEN: 'INVALID_REFRESH_TOKEN',
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
+  /** Admin area: this session hasn't passed the authenticator step (ADR-0018). */
+  MFA_REQUIRED: 'MFA_REQUIRED',
+  /** Admin area: set up an authenticator app first. */
+  MFA_SETUP_REQUIRED: 'MFA_SETUP_REQUIRED',
+  MFA_INVALID: 'MFA_INVALID',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;

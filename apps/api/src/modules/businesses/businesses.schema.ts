@@ -23,6 +23,8 @@ export const businessStatus = pgEnum('business_status', [
   'VERIFIED',
   'REJECTED',
   'SUSPENDED',
+  /** Final: the owner deleted their account (Phase 8). Hidden everywhere; the record is kept. */
+  'CLOSED',
 ]);
 export type BusinessStatus = (typeof businessStatus.enumValues)[number];
 

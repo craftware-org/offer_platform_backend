@@ -54,7 +54,10 @@ export class AuthController {
   @Public()
   @Post('otp/verify')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Verify the code; returns tokens. Creates the account on first login.' })
+  @ApiOperation({
+    summary:
+      'Verify the code; returns tokens, or { mfaRequired, mfaToken } when 2-step login is on (then POST /auth/mfa/verify). Creates the account on first login.',
+  })
   verifyOtp(
     @Body({ schema: verifyOtpSchema }) body: z.infer<typeof verifyOtpSchema>,
     @Headers('user-agent') userAgent?: string,
@@ -79,7 +82,8 @@ export class AuthController {
   @Post('password/login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Log in with phone or email + password (once set). 5 wrong tries lock the account for 15 minutes.',
+    summary:
+      'Log in with phone or email + password (once set). 5 wrong tries lock the account for 15 minutes.',
   })
   passwordLogin(
     @Body({ schema: passwordLoginSchema }) body: z.infer<typeof passwordLoginSchema>,
@@ -106,7 +110,8 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Change the password (needs the current one). Logs out every other device and returns new tokens.',
+    summary:
+      'Change the password (needs the current one). Logs out every other device and returns new tokens.',
   })
   changePassword(
     @Body({ schema: changePasswordSchema }) body: z.infer<typeof changePasswordSchema>,
@@ -117,6 +122,7 @@ export class AuthController {
     return this.auth.changePassword(principal.userId, body.currentPassword, body.newPassword, {
       userAgent,
       requestId,
+      mfa: principal.mfa,
     });
   }
 

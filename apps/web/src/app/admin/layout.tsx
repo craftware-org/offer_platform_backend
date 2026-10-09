@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { TwoStepSettings } from '@/components/two-step-settings';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 /** Admin sections; each is shown only to admins with its permission (the API enforces it anyway). */
@@ -21,6 +23,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { can } = useAuth();
   const pathname = usePathname();
   const visible = SECTIONS.filter((s) => can(s.permission));
+  const isAdmin = visible.length > 0;
+  // Admin work needs 2-step login (ADR-0018); the API enforces it, this only shows the way.
+  const [twoStep, setTwoStep] = useState<'checking' | 'on' | 'off'>('checking');
+  useEffect(() => {
+    if (!isAdmin) return;
+    api<{ enabled: boolean }>('/me/mfa')
+      .then((s) => setTwoStep(s.enabled ? 'on' : 'off'))
+      .catch(() => setTwoStep('on')); // let the pages show the API's own message
+  }, [isAdmin]);
   const isActive = (href: string) =>
     href === '/admin'
       ? pathname === '/admin' || pathname.startsWith('/admin/businesses') || pathname.startsWith('/admin/offers')
@@ -42,7 +53,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           ))}
         </nav>
       )}
-      {children}
+      {isAdmin && twoStep === 'off' ? (
+        <div className="max-w-xl space-y-3">
+          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            To use the admin area, set up 2-step login first. It keeps the admin area safe even if your password leaks.
+          </p>
+          <TwoStepSettings onDone={() => setTwoStep('on')} />
+        </div>
+      ) : isAdmin && twoStep === 'checking' ? (
+        <p className="text-sm text-gray-500">Loading…</p>
+      ) : (
+        children
+      )}
     </div>
   );
 }

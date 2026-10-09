@@ -349,5 +349,5 @@ Migrations run as a separate release step, never automatically on app boot in pr
 | 5 | Engagement: save, follow, share tracking, contact clicks, reports | ✅ Done 2026-10-08 (180 unit + 141 integration tests) |
 | 6 | Notifications: infrastructure, preferences, dispatch ([ADR-0016](docs/adr/0016-notifications-domain-events-and-email-outbox.md): in-app inbox + email; push later with the mobile apps) | ✅ Done 2026-10-08 (184 unit + 149 integration tests) |
 | 7 | Analytics: ingestion, aggregates, business + admin analytics ([ADR-0017](docs/adr/0017-analytics-counting-rollups-and-charts.md)) | ✅ Done 2026-10-09 (190 unit + 155 integration tests) |
-| 8 | Security audit | Findings fixed |
+| 8 | Security audit ([report](docs/security-audit-2026-10-09.md), [ADR-0018](docs/adr/0018-admin-two-step-login-with-authenticator-app.md)) | ✅ Done 2026-10-09 (194 unit + 163 integration tests); findings fixed or accepted by the owner |
 | 9 | Production readiness: production Docker image, AWS infrastructure, staging deploy pipeline, backups, monitoring, deployment docs | MVP success scenario passes against a real DB |

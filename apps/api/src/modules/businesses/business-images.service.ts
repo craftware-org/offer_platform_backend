@@ -3,12 +3,12 @@ import { and, count, eq, inArray } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 import { AppError, ErrorCode } from '../../common/errors/app-error.js';
 import { APP_CONFIG, type AppConfig } from '../../config/config.module.js';
-import { DB, type Database } from '../../infrastructure/database/database.module.js';
+import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { ImageProcessor, type ImageVariant } from '../../infrastructure/images/image-processor.js';
 import { RateLimiterService } from '../../infrastructure/redis/rate-limiter.service.js';
 import { StorageProvider } from '../../infrastructure/storage/storage.module.js';
 import { BusinessReader } from './business-reader.js';
-import { canChangeVerificationPhotos } from './business-status.machine.js';
+import { canChangeVerificationPhotos, isFrozen } from './business-status.machine.js';
 import { toImageView, type ImageView } from './business-views.js';
 import {
   businessImages,
@@ -154,7 +154,8 @@ export class BusinessImagesService {
   }
 
   private assertCanChange(status: BusinessStatus, kind: BusinessImageKind) {
-    if (status === 'SUSPENDED') throw AppError.forbidden('This business is suspended');
+    if (isFrozen(status))
+      throw AppError.forbidden(`This business is ${status === 'CLOSED' ? 'closed' : 'suspended'}`);
     if (isVerificationKind(kind) && !canChangeVerificationPhotos(status)) {
       throw new AppError(
         ErrorCode.FIELDS_LOCKED,
@@ -198,6 +199,32 @@ export class BusinessImagesService {
         await this.storage.deletePrefix(image.storagePrefix);
       } catch (error) {
         this.logger.error({ err: error, imageId: image.id }, 'Failed to delete image files');
+      }
+    }
+  }
+
+  /**
+   * Account deletion: the owner photos (a picture of a person) of closed businesses are deleted.
+   * Rows go in the caller's transaction; call `deleteFiles` with the result after it commits.
+   */
+  async removeOwnerPhotos(businessIds: string[], tx: Executor): Promise<string[]> {
+    if (businessIds.length === 0) return [];
+    const removed = await tx
+      .delete(businessImages)
+      .where(
+        and(inArray(businessImages.businessId, businessIds), eq(businessImages.kind, 'VERIFICATION_OWNER')),
+      )
+      .returning({ storagePrefix: businessImages.storagePrefix });
+    return removed.map((r) => r.storagePrefix);
+  }
+
+  /** Best effort, after the database change committed: a failure leaves an orphaned file (logged). */
+  async deleteFiles(storagePrefixes: string[]): Promise<void> {
+    for (const prefix of storagePrefixes) {
+      try {
+        await this.storage.deletePrefix(prefix);
+      } catch (error) {
+        this.logger.error({ err: error, prefix }, 'Failed to delete image files');
       }
     }
   }

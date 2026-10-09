@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<string, string> = {
   VERIFIED: 'Verified',
   REJECTED: 'Rejected',
   SUSPENDED: 'Suspended',
+  CLOSED: 'Closed',
 };
 const sumOf = (s: { value: number }[]) => s.reduce((n, p) => n + p.value, 0);
 
@@ -178,7 +179,7 @@ function Insights() {
           <p className="text-xs text-gray-500">
             Everyone is counted, logged in or not, once per visitor per 30 minutes; bots, shop staff and admins are not.
             No names, locations or IP addresses are stored. Searches are saved without who searched; numbers longer
-            than 4 digits are hidden.
+            than 4 digits and email addresses are hidden.
           </p>
         </>
       )}

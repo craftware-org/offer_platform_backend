@@ -21,5 +21,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0015](0015-password-login.md) | Password login after a one-time verification code | Accepted |
 | [0016](0016-notifications-domain-events-and-email-outbox.md) | Notifications via in-process domain events and an email outbox | Accepted |
 | [0017](0017-analytics-counting-rollups-and-charts.md) | Analytics: anonymous counting, daily rollups, read-only reporting module, hand-drawn charts | Accepted |
+| [0018](0018-admin-two-step-login-with-authenticator-app.md) | 2-step login for admins with an authenticator app (TOTP) | Accepted |
 
 Template: [`template.md`](template.md)

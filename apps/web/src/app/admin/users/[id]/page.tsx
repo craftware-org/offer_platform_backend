@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { AdminTwoStep } from '@/components/admin-two-step';
 import { RequireAuth } from '@/components/require-auth';
 import { StatusBadge } from '@/components/status-badge';
 import { api, errorMessage } from '@/lib/api';
@@ -123,6 +124,8 @@ function UserDetail() {
           </button>
         </section>
       )}
+
+      {(u.roles.includes('ADMIN') || u.roles.includes('SUPER_ADMIN')) && <AdminTwoStep userId={u.id} isMe={isMe} />}
 
       {can('roles:assign') && u.status === 'ACTIVE' && (
         <section className="card space-y-3">

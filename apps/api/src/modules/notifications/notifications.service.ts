@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
-import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { AppError } from '../../common/errors/app-error.js';
 import { Page, offsetOf, type PageQuery } from '../../common/http/pagination.js';
 import { APP_CONFIG, type AppConfig } from '../../config/config.module.js';
-import { DB, type Database } from '../../infrastructure/database/database.module.js';
+import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { EmailProvider } from '../../infrastructure/email/email.module.js';
 import { DomainEvents } from '../../infrastructure/events/domain-events.js';
 import { Role } from '../access-control/access-control.catalog.js';
@@ -71,7 +71,11 @@ const BUSINESS_ACTION_TYPE: Record<string, NotificationType | undefined> = {
 };
 
 const istTime = (d: Date) =>
-  new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }).format(d);
+  new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(d);
 const istDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -102,7 +106,9 @@ export class NotificationsService implements OnModuleInit {
     private readonly reports: ReportsService,
   ) {
     // A separate key derived from an existing secret: unsubscribe links can't be forged.
-    this.unsubscribeKey = createHmac('sha256', config.OTP_HASH_SECRET).update('notifications-unsubscribe-v1').digest();
+    this.unsubscribeKey = createHmac('sha256', config.OTP_HASH_SECRET)
+      .update('notifications-unsubscribe-v1')
+      .digest();
   }
 
   onModuleInit(): void {
@@ -114,18 +120,37 @@ export class NotificationsService implements OnModuleInit {
 
   // ---- Event handlers -----------------------------------------------------------------------
 
-  private async onBusinessStatus(e: { businessId: string; action: string; status: string; reason: string | null }) {
+  private async onBusinessStatus(e: {
+    businessId: string;
+    action: string;
+    status: string;
+    reason: string | null;
+  }) {
     const type = BUSINESS_ACTION_TYPE[e.action];
     if (!type) return;
     const name = (await this.businessReader.labelsFor([e.businessId])).get(e.businessId) ?? 'Your business';
     const text: Record<string, [string, string]> = {
-      BUSINESS_VERIFIED: [`“${name}” is verified`, 'Customers can now find your shop, and you can publish offers.'],
-      BUSINESS_REJECTED: [`Verification of “${name}” was not approved`, `Reason: ${e.reason ?? 'not given'}. Update the details and submit again.`],
-      BUSINESS_SUSPENDED: [`“${name}” has been suspended`, `Reason: ${e.reason ?? 'not given'}. It is hidden from customers until reactivated.`],
+      BUSINESS_VERIFIED: [
+        `“${name}” is verified`,
+        'Customers can now find your shop, and you can publish offers.',
+      ],
+      BUSINESS_REJECTED: [
+        `Verification of “${name}” was not approved`,
+        `Reason: ${e.reason ?? 'not given'}. Update the details and submit again.`,
+      ],
+      BUSINESS_SUSPENDED: [
+        `“${name}” has been suspended`,
+        `Reason: ${e.reason ?? 'not given'}. It is hidden from customers until reactivated.`,
+      ],
       BUSINESS_REACTIVATED: [`“${name}” is active again`, 'Your shop is back on the platform.'],
     };
     const [title, body] = text[type]!;
-    await this.notify(await this.businesses.memberUserIds(e.businessId), { type, title, body, link: `/business/${e.businessId}` });
+    await this.notify(await this.businesses.memberUserIds(e.businessId), {
+      type,
+      title,
+      body,
+      link: `/business/${e.businessId}`,
+    });
   }
 
   private async onBusinessWarned(e: { businessId: string; offerId: string; message: string }) {
@@ -138,7 +163,12 @@ export class NotificationsService implements OnModuleInit {
     });
   }
 
-  private async onOfferModerated(e: { offerId: string; action: string; status: string; reason: string | null }) {
+  private async onOfferModerated(e: {
+    offerId: string;
+    action: string;
+    status: string;
+    reason: string | null;
+  }) {
     const type = OFFER_ACTION_TYPE[e.action];
     if (!type) return;
     const [offer] = await this.offerReader.summaries([e.offerId]);
@@ -147,14 +177,27 @@ export class NotificationsService implements OnModuleInit {
     const text: Record<string, [string, string]> = {
       OFFER_APPROVED: [
         `Your offer “${offer.title}” is approved`,
-        e.status === 'SCHEDULED' ? 'It goes live automatically at its start time.' : 'It is now live for customers.',
+        e.status === 'SCHEDULED'
+          ? 'It goes live automatically at its start time.'
+          : 'It is now live for customers.',
       ],
       OFFER_REJECTED: [`Your offer “${offer.title}” was rejected`, reason],
-      OFFER_CHANGES_REQUESTED: [`Changes requested to “${offer.title}”`, `${reason} Edit the offer and submit it again.`],
-      OFFER_SUSPENDED: [`Your offer “${offer.title}” was suspended`, `${reason} It is hidden from customers.`],
+      OFFER_CHANGES_REQUESTED: [
+        `Changes requested to “${offer.title}”`,
+        `${reason} Edit the offer and submit it again.`,
+      ],
+      OFFER_SUSPENDED: [
+        `Your offer “${offer.title}” was suspended`,
+        `${reason} It is hidden from customers.`,
+      ],
     };
     const [title, body] = text[type]!;
-    await this.notify(await this.businesses.memberUserIds(offer.businessId), { type, title, body, link: `/business/offers/${offer.id}` });
+    await this.notify(await this.businesses.memberUserIds(offer.businessId), {
+      type,
+      title,
+      body,
+      link: `/business/offers/${offer.id}`,
+    });
   }
 
   /** Followers hear about each live offer once (re-activations don't repeat it). */
@@ -205,7 +248,8 @@ export class NotificationsService implements OnModuleInit {
   /** One summary per day for admins, only when something is waiting. */
   async sendAdminDailySummary(now = new Date()): Promise<number> {
     const page = { page: 1, pageSize: 1 };
-    const businesses = (await this.businessModeration.list({ ...page, status: 'UNDER_REVIEW' })).meta.totalItems;
+    const businesses = (await this.businessModeration.list({ ...page, status: 'UNDER_REVIEW' })).meta
+      .totalItems;
     const offers = (await this.offerModeration.list({ ...page, status: 'PENDING_REVIEW' })).meta.totalItems;
     const reports = (await this.reports.list({ ...page, status: 'OPEN' })).meta.totalItems;
     if (businesses + offers + reports === 0) return 0;
@@ -280,7 +324,15 @@ export class NotificationsService implements OnModuleInit {
     const [total] = await this.db.select({ value: count() }).from(notifications).where(where);
     const unread = await this.unreadCount(userId);
     return new Page(
-      rows.map((r) => ({ id: r.id, type: r.type, title: r.title, body: r.body, link: r.link, read: r.readAt !== null, createdAt: r.createdAt })),
+      rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        title: r.title,
+        body: r.body,
+        link: r.link,
+        read: r.readAt !== null,
+        createdAt: r.createdAt,
+      })),
       query,
       total?.value ?? 0,
       { unread },
@@ -291,7 +343,9 @@ export class NotificationsService implements OnModuleInit {
     const [row] = await this.db
       .select({ value: count() })
       .from(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.inApp, true), isNull(notifications.readAt)));
+      .where(
+        and(eq(notifications.userId, userId), eq(notifications.inApp, true), isNull(notifications.readAt)),
+      );
     return row?.value ?? 0;
   }
 
@@ -309,11 +363,18 @@ export class NotificationsService implements OnModuleInit {
   /** The types that apply to this person: customer types always; business types if they manage one; admin if admin. */
   async preferences(userId: string, isAdmin: boolean): Promise<PreferenceView[]> {
     const managesBusiness = (await this.businesses.listManaged(userId)).length > 0;
-    const rows = await this.db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+    const rows = await this.db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
     const saved = new Map(rows.map((r) => [r.type, { inApp: r.inApp, email: r.email }]));
     return NOTIFICATION_TYPES.filter((t) => {
       const audience = CATALOG[t].audience;
-      return audience === 'CUSTOMER' || (audience === 'BUSINESS' && managesBusiness) || (audience === 'ADMIN' && isAdmin);
+      return (
+        audience === 'CUSTOMER' ||
+        (audience === 'BUSINESS' && managesBusiness) ||
+        (audience === 'ADMIN' && isAdmin)
+      );
     }).map((type) => ({
       type,
       audience: CATALOG[type].audience,
@@ -327,7 +388,10 @@ export class NotificationsService implements OnModuleInit {
     await this.db
       .insert(notificationPreferences)
       .values({ userId, type, ...channels })
-      .onConflictDoUpdate({ target: [notificationPreferences.userId, notificationPreferences.type], set: channels });
+      .onConflictDoUpdate({
+        target: [notificationPreferences.userId, notificationPreferences.type],
+        set: channels,
+      });
   }
 
   // ---- One-click unsubscribe -----------------------------------------------------------------
@@ -342,10 +406,17 @@ export class NotificationsService implements OnModuleInit {
     const [payload, signature] = token.split('.');
     const expected = payload ? this.sign(payload) : '';
     const valid =
-      !!payload && !!signature && signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+      !!payload &&
+      !!signature &&
+      signature.length === expected.length &&
+      timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
     if (!valid) throw AppError.validation({ token: 'This unsubscribe link is not valid' });
-    const [userId, type] = Buffer.from(payload!, 'base64url').toString().split(':') as [string, NotificationType];
-    if (!NOTIFICATION_TYPES.includes(type)) throw AppError.validation({ token: 'This unsubscribe link is not valid' });
+    const [userId, type] = Buffer.from(payload!, 'base64url').toString().split(':') as [
+      string,
+      NotificationType,
+    ];
+    if (!NOTIFICATION_TYPES.includes(type))
+      throw AppError.validation({ token: 'This unsubscribe link is not valid' });
     const current = (await this.channelsFor([userId], type)).get(userId)!;
     await this.setPreference(userId, type, { inApp: current.inApp, email: false });
     return { type, label: CATALOG[type].label };
@@ -353,6 +424,23 @@ export class NotificationsService implements OnModuleInit {
 
   private sign(payload: string): string {
     return createHmac('sha256', this.unsubscribeKey).update(payload).digest('base64url');
+  }
+
+  // ---- Personal data (Phase 8) ---------------------------------------------------------------
+
+  /** Account deletion: the inbox and the notification settings go. */
+  async forgetUser(userId: string, tx: Executor): Promise<void> {
+    await tx.delete(notifications).where(eq(notifications.userId, userId));
+    await tx.delete(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+  }
+
+  /** Retention (owner decision 2026-10-09: 1 year): older notifications are deleted, read or not. */
+  async purgeBefore(cutoff: Date): Promise<number> {
+    const rows = await this.db
+      .delete(notifications)
+      .where(lt(notifications.createdAt, cutoff))
+      .returning({ id: notifications.id });
+    return rows.length;
   }
 
   // ---- Email outbox (worker) -----------------------------------------------------------------
@@ -390,8 +478,14 @@ export class NotificationsService implements OnModuleInit {
       const to = addresses.get(row.user_id);
       try {
         if (!to) throw new Error('No verified email address');
-        await this.email.send({ ...this.renderEmail(row.user_id, row.type, row.title, row.body, row.link, to.name), to: to.email });
-        await this.db.update(notifications).set({ emailStatus: 'SENT', emailSentAt: new Date(), emailError: null }).where(eq(notifications.id, row.id));
+        await this.email.send({
+          ...this.renderEmail(row.user_id, row.type, row.title, row.body, row.link, to.name),
+          to: to.email,
+        });
+        await this.db
+          .update(notifications)
+          .set({ emailStatus: 'SENT', emailSentAt: new Date(), emailError: null })
+          .where(eq(notifications.id, row.id));
         sent++;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -405,14 +499,24 @@ export class NotificationsService implements OnModuleInit {
           })
           .where(eq(notifications.id, row.id));
         if (giveUp) failed++;
-        this.logger.warn({ notificationId: row.id, attempt: row.email_attempts, giveUp, error: message }, 'Notification email failed');
+        this.logger.warn(
+          { notificationId: row.id, attempt: row.email_attempts, giveUp, error: message },
+          'Notification email failed',
+        );
       }
     }
     if (sent || failed) this.logger.log({ sent, failed }, 'Notification emails processed');
     return { sent, failed };
   }
 
-  private renderEmail(userId: string, type: NotificationType, title: string, body: string, link: string | null, name: string | null) {
+  private renderEmail(
+    userId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    link: string | null,
+    name: string | null,
+  ) {
     const base = this.config.APP_PUBLIC_URL.replace(/\/+$/, '');
     const brand = this.config.APP_DISPLAY_NAME;
     const open = link ? `${base}${link}` : base;

@@ -58,6 +58,16 @@ export interface LoginResult extends TokenPair {
   user: User;
 }
 
+/** Answer of a login when 2-step login is on: send the authenticator code to /auth/mfa/verify (ADR-0018). */
+export interface MfaChallenge {
+  mfaRequired: true;
+  mfaToken: string;
+  mfaTokenExpiresIn: number;
+}
+
+export type LoginOutcome = LoginResult | MfaChallenge;
+export const needsMfa = (r: LoginOutcome): r is MfaChallenge => 'mfaRequired' in r && r.mfaRequired;
+
 export interface Category {
   id: string;
   parentId: string | null;

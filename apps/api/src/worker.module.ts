@@ -16,8 +16,20 @@ import { DomainEventsModule } from './infrastructure/events/domain-events.js';
 import { RedisModule } from './infrastructure/redis/redis.module.js';
 import { StorageModule } from './infrastructure/storage/storage.module.js';
 import { ANALYTICS_QUEUE, AnalyticsProcessor, AnalyticsScheduler } from './jobs/analytics.job.js';
-import { NOTIFICATIONS_QUEUE, NotificationsProcessor, NotificationsScheduler } from './jobs/notifications.job.js';
+import {
+  NOTIFICATIONS_QUEUE,
+  NotificationsProcessor,
+  NotificationsScheduler,
+} from './jobs/notifications.job.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
+import {
+  MAINTENANCE_QUEUE,
+  MaintenanceProcessor,
+  MaintenanceScheduler,
+  RetentionService,
+} from './jobs/retention.job.js';
+import { AuditModule } from './modules/audit/audit.module.js';
+import { AuthDataModule } from './modules/auth/auth-data.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 
 /** The background worker process: scheduled and queued jobs only, no HTTP (ADR-0002, ADR-0007). */
@@ -39,6 +51,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     BullModule.registerQueue({ name: OFFER_LIFECYCLE_QUEUE }),
     BullModule.registerQueue({ name: NOTIFICATIONS_QUEUE }),
     BullModule.registerQueue({ name: ANALYTICS_QUEUE }),
+    BullModule.registerQueue({ name: MAINTENANCE_QUEUE }),
     // Notifications (ADR-0016): the worker announces offer.went_live and sends the email outbox.
     DomainEventsModule,
     RedisModule,
@@ -48,6 +61,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     NotificationsModule,
     // Analytics (ADR-0017): nightly daily totals + clean-up, weekly business summary.
     AnalyticsModule,
+    // Retention clean-up of personal data (Phase 8).
+    AuthDataModule,
+    AuditModule,
   ],
   providers: [
     OfferLifecycleProcessor,
@@ -56,6 +72,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     NotificationsScheduler,
     AnalyticsProcessor,
     AnalyticsScheduler,
+    RetentionService,
+    MaintenanceProcessor,
+    MaintenanceScheduler,
   ],
 })
 export class WorkerModule {}

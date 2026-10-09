@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, lt, type SQL } from 'drizzle-orm';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
 import { DB, type Database, type Executor } from '../../infrastructure/database/database.module.js';
 import { auditLogs, type AuditLogRow } from './audit.schema.js';
@@ -10,6 +10,11 @@ export const AuditAction = {
   USER_SUSPENDED: 'USER_SUSPENDED',
   USER_REACTIVATED: 'USER_REACTIVATED',
   USER_DELETED_ACCOUNT: 'USER_DELETED_ACCOUNT',
+  MFA_ENABLED: 'MFA_ENABLED',
+  MFA_DISABLED: 'MFA_DISABLED',
+  MFA_RESET: 'MFA_RESET',
+  MFA_RECOVERY_CODE_USED: 'MFA_RECOVERY_CODE_USED',
+  MFA_RECOVERY_CODES_RENEWED: 'MFA_RECOVERY_CODES_RENEWED',
   UNVERIFIED_EMAIL_RELEASED: 'UNVERIFIED_EMAIL_RELEASED',
   ROLE_GRANTED: 'ROLE_GRANTED',
   ROLE_REVOKED: 'ROLE_REVOKED',
@@ -23,6 +28,7 @@ export const AuditAction = {
   BUSINESS_REJECTED: 'BUSINESS_REJECTED',
   BUSINESS_SUSPENDED: 'BUSINESS_SUSPENDED',
   BUSINESS_REACTIVATED: 'BUSINESS_REACTIVATED',
+  BUSINESS_CLOSED: 'BUSINESS_CLOSED',
   BUSINESS_UPDATED_BY_ADMIN: 'BUSINESS_UPDATED_BY_ADMIN',
   CATEGORY_CREATED: 'CATEGORY_CREATED',
   CATEGORY_CHANGED: 'CATEGORY_CHANGED',
@@ -83,6 +89,15 @@ export class AuditService {
       newValue: entry.newValue ?? null,
       requestId: entry.requestId ?? null,
     });
+  }
+
+  /** Retention (owner decision 2026-10-09: 7 years). */
+  async purgeBefore(cutoff: Date): Promise<number> {
+    const rows = await this.db
+      .delete(auditLogs)
+      .where(lt(auditLogs.createdAt, cutoff))
+      .returning({ id: auditLogs.id });
+    return rows.length;
   }
 
   async list(query: AuditQuery): Promise<Page<AuditLogRow>> {

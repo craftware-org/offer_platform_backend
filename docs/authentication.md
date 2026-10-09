@@ -31,7 +31,35 @@ The real SMS vendor is **pending** (it needs TRAI DLT registration). Until then 
 
 ## Account deletion
 
-`DELETE /api/v1/auth/account` erases phone, name and email, sets the status to `DELETED`, removes roles and revokes every session, in one transaction. The row itself is kept so audit history and references stay intact. The same phone can later register as a brand-new account.
+`DELETE /api/v1/auth/account` erases personal data in one transaction (completed in Phase 8):
+- the account: phone, name, email, password, verification dates; the status becomes `DELETED`; roles are removed;
+- every session, every login code sent to the phone or email, 2-step login and recovery codes;
+- notifications and notification settings, saved offers and follows; past taps stay counted but no longer point at the person;
+- shops the person owns are **closed** (owner decision 2026-10-09): hidden everywhere, their offers end, the owner photo is deleted; the shop record stays for history.
+
+The user row itself is kept so audit history and references stay intact. The same phone can later register as a brand-new account.
+
+## 2-step login (Phase 8, [ADR-0018](adr/0018-admin-two-step-login-with-authenticator-app.md))
+
+- **Required for admins:** every admin permission needs a session that passed the authenticator step. Without it the API answers `403 MFA_SETUP_REQUIRED` (not set up) or `MFA_REQUIRED` (log in again).
+- **Setting it up:** `POST /me/mfa/setup` (QR code + key) → `POST /me/mfa/enable` with the first code. It returns 10 one-time recovery codes and a new session, and every other session ends.
+- **Logging in:** code, password and forgot-password logins answer `{ mfaRequired, mfaToken }` instead of tokens. `POST /auth/mfa/verify` with the 6-digit app code, or a recovery code, finishes the login.
+- **Protections:**
+  - a code works once;
+  - 5 wrong codes lock the step for 15 minutes;
+  - secrets are encrypted at rest;
+  - resetting or turning it off ends admin access immediately.
+- **Lost phone:** a recovery code; a Super admin's "Reset 2-step login"; or on the server `admin:reset-mfa --email|--phone`.
+
+## Retention (Phase 8)
+
+A nightly job (03:00 IST) deletes:
+- login codes after 90 days;
+- ended sessions 90 days after they end;
+- notifications after 1 year;
+- activity-log entries after 7 years.
+
+Owner decision 2026-10-09. Analytics has its own 180-day rule (ADR-0017).
 
 ## Email login (Phase 4)
 

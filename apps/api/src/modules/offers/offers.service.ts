@@ -7,6 +7,7 @@ import { DB, type Database, type Executor } from '../../infrastructure/database/
 import { isUniqueViolation } from '../../infrastructure/database/pg-errors.js';
 import { StorageProvider } from '../../infrastructure/storage/storage.module.js';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
+import { isFrozen } from '../businesses/business-status.machine.js';
 import { BusinessReader } from '../businesses/business-reader.js';
 import type { BusinessRow } from '../businesses/businesses.schema.js';
 import { CategoriesService } from '../categories/categories.service.js';
@@ -75,7 +76,10 @@ export class OffersService {
     const id = await this.uniquely(() =>
       this.db.transaction(async (tx) => {
         const business = await this.businesses.findManaged(actor.userId, businessId, tx);
-        if (business.status === 'SUSPENDED') throw AppError.forbidden('This business is suspended');
+        if (isFrozen(business.status))
+          throw AppError.forbidden(
+            `This business is ${business.status === 'CLOSED' ? 'closed' : 'suspended'}`,
+          );
         await this.categories.assertAssignable(input.categoryId, tx);
         const pricing = normalizePricing(input.pricing);
 
@@ -245,7 +249,8 @@ export class OffersService {
   }
 
   assertEditable(offer: OfferRow, business: BusinessRow): void {
-    if (business.status === 'SUSPENDED') throw AppError.forbidden('This business is suspended');
+    if (isFrozen(business.status))
+      throw AppError.forbidden(`This business is ${business.status === 'CLOSED' ? 'closed' : 'suspended'}`);
     if (!EDITABLE_STATUSES.includes(offer.status)) {
       const hint = offer.status === 'PENDING_REVIEW' ? ' Withdraw it from review first.' : '';
       throw AppError.conflict(`An offer that is ${offer.status} cannot be edited.${hint}`);
@@ -255,7 +260,8 @@ export class OffersService {
   async act(actor: Actor, offerId: string, action: BusinessOfferAction): Promise<OwnerOfferView> {
     await this.db.transaction(async (tx) => {
       const { offer, business } = await this.reader.findManaged(actor.userId, offerId, tx, true);
-      if (business.status === 'SUSPENDED') throw AppError.forbidden('This business is suspended');
+      if (isFrozen(business.status))
+        throw AppError.forbidden(`This business is ${business.status === 'CLOSED' ? 'closed' : 'suspended'}`);
       const now = new Date();
       const next = nextOfferStatus(offer.status, action, offer, now);
       const set: Partial<typeof offers.$inferInsert> = { status: next };

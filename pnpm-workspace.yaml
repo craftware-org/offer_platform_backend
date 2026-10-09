@@ -10,3 +10,8 @@ allowBuilds:
   ssh2: false              # optional native crypto build, falls back to JS
   protobufjs: false        # postinstall only prints version notices
   msgpackr-extract: false  # optional native speed-up for BullMQ's msgpackr, falls back to JS
+
+# Security fixes for build-time dependencies (Phase 8 audit, 2026-10-09). Neither runs on the servers.
+overrides:
+  source-map-js: ^1.2.2                         # GHSA: event-loop DoS via source-map offsets (postcss, Tailwind)
+  '@esbuild-kit/core-utils>esbuild': ^0.25.12   # GHSA: dev-server CORS (drizzle-kit's old loader)

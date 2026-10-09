@@ -17,6 +17,8 @@ import { EmailProvider, type EmailMessage } from '../../src/infrastructure/email
 import { SmsProvider } from '../../src/infrastructure/sms/sms.module.js';
 import { withDatabase } from '../global-setup.js';
 import { AccessControlService } from '../../src/modules/access-control/access-control.service.js';
+import { Role } from '../../src/modules/access-control/access-control.catalog.js';
+import { base32Decode, stepAt, totpCode } from '../../src/modules/auth/totp.js';
 
 /** Captures outgoing SMS so tests can read the OTP, exactly as a user would from their phone. */
 /** Captures outgoing email so tests can read login codes, like a user reading their inbox. */
@@ -140,6 +142,10 @@ export interface LoggedIn {
   accessToken: string;
   refreshToken: string;
   phone: string;
+  /** Set by makeAdmin(): the authenticator secret, to produce codes in tests. */
+  totpSecret?: Buffer;
+  /** Last authenticator step used (codes can't be reused). */
+  totpLastStep?: number;
 }
 
 /** Full OTP login through the public API. */
@@ -159,3 +165,41 @@ export async function login(ctx: TestContext, phone = uniquePhone()): Promise<Lo
 }
 
 export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+/**
+ * A fresh authenticator code for a user set up by makeAdmin(): the current 30-second step, or the
+ * next one if the current step was already used (the server accepts one step of clock drift).
+ */
+export function nextTotp(user: LoggedIn): string {
+  if (!user.totpSecret) throw new Error('No authenticator set up for this test user');
+  const now = stepAt(new Date());
+  const step = Math.max(now, (user.totpLastStep ?? -1) + 1);
+  if (step > now + 1) throw new Error('Out of fresh authenticator codes for this 30-second window');
+  user.totpLastStep = step;
+  return totpCode(user.totpSecret, step);
+}
+
+/**
+ * Grants an admin role and sets up 2-step login through the real API (admin permissions need a
+ * session that passed the authenticator step, ADR-0018). Updates `user`'s tokens in place.
+ */
+export async function makeAdmin(
+  ctx: TestContext,
+  user: LoggedIn,
+  role: Role = Role.ADMIN,
+): Promise<LoggedIn> {
+  await ctx.app.get(AccessControlService).grantRole(user.userId, role, null);
+  if (!user.totpSecret) {
+    const setup = await ctx.http().post('/api/v1/me/mfa/setup').set(bearer(user.accessToken)).expect(200);
+    user.totpSecret = base32Decode(setup.body.data.secret);
+    const res = await ctx
+      .http()
+      .post('/api/v1/me/mfa/enable')
+      .set(bearer(user.accessToken))
+      .send({ code: nextTotp(user) })
+      .expect(200);
+    user.accessToken = res.body.data.tokens.accessToken;
+    user.refreshToken = res.body.data.tokens.refreshToken;
+  }
+  return user;
+}
