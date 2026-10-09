@@ -53,3 +53,42 @@ jobs:
         with:
           name: openapi
           path: apps/api/openapi.json
+
+  # Phase 9: every green push to main deploys the API to the preview server (the website deploys
+  # itself through Vercel). The SSH key is a dedicated, restricted deploy key stored as the GitHub
+  # secret STAGING_SSH_KEY by the owner; the server's host key is pinned below.
+  deploy-staging:
+    name: Deploy API to the preview server
+    needs: [api]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: SSH key and pinned host key
+        id: key
+        env:
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          if [ -z "$STAGING_SSH_KEY" ]; then
+            echo "::warning title=Deploy skipped::The repository secret STAGING_SSH_KEY is not set, so the API was not deployed. See docs/deployment.md (Deploy)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$STAGING_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "13.235.201.166 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjZfiwYpe02nOmJ1yQAvc7q/p+dHNXHBub1ipc/jdK4" > ~/.ssh/known_hosts
+
+      - name: Deploy (build on the server, migrate, restart, health check)
+        if: steps.key.outputs.skip != 'true'
+        run: bash deploy/staging/deploy.sh 13.235.201.166 ~/.ssh/deploy_key
+
+      - name: Remove the key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

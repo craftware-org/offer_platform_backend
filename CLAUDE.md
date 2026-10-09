@@ -62,9 +62,9 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
-| 9 | Production readiness: RDS/ElastiCache/S3, CI deploys, monitoring, real SMS, real domain | ⏳ Next (needs owner decisions + approval) |
+| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests, off-server backups, legal pages, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 194 unit + 163 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring
 
 ---
 
@@ -83,7 +83,8 @@ This is a **team-only preview**: data may be reset, and search engines are told 
 | What | Where | Notes |
 |---|---|---|
 | **Website** | https://dodoom.vercel.app | Vercel team **Craftware**, project `dodoom`, root `apps/web`, region `bom1` (Mumbai). **Auto-deploys every push to `main`**; other branches get preview URLs. Also reachable at `dodoom-omega.vercel.app`. |
-| **API** | https://13-235-201-166.sslip.io/api/v1 | One EC2 instance (ADR-0013). Interactive docs: `/api/docs`. Health: `/api/v1/health/ready`. |
+| **API** | https://13-235-201-166.sslip.io/api/v1 | One EC2 instance (ADR-0013). Interactive docs: `/api/docs`. Health: `/api/v1/health/ready`, worker: `/api/v1/health/worker`. **Auto-deploys every green push to `main`** (CI job). |
+| Monitoring | GitHub Actions "Monitor preview" | Every 15 minutes; alerts as GitHub issues labelled `monitoring`. |
 | API server | AWS `ap-south-1` (Mumbai) | Instance `Offer-Platform` (`i-0a2e864dad08c59b5`), **t3.micro + 2 GB swap**, Ubuntu 26.04, **Elastic IP 13.235.201.166**. Docker Compose runs Caddy (auto-HTTPS), API, worker, PostgreSQL/PostGIS and Valkey. App folder: `/opt/offer-platform/src/deploy/staging`. |
 | Domain | `sslip.io` | Free wildcard DNS: `13-235-201-166.sslip.io` resolves to the Elastic IP. Let's Encrypt certificate by Caddy. |
 | Email login codes | Gmail SMTP, sender `craftwaretech@gmail.com` | App Password stored only in the server `.env` (entered with `set-secret.sh`). |
@@ -181,13 +182,23 @@ pnpm --filter @offer-platform/api test:integration    # needs Docker (Testcontai
 - `ENABLE_EXPERIMENTAL_COREPACK=1` (so Vercel uses pnpm 12)
 - `NEXT_TELEMETRY_DISABLED=1`
 
-**API** is not auto-deployed yet. From the repo root on a machine that has the key:
+**API:** every **green push to `main`** deploys to the preview automatically (Phase 9):
+- the CI job "Deploy API to the preview server" runs after all checks pass, using `deploy.sh` with a dedicated, restricted deploy key (GitHub secret `STAGING_SSH_KEY`) and the server's pinned host key;
+- the website deploys on merge through Vercel at the same time, so **API changes must stay backward compatible**;
+- when the website needs a new API, deploy the API from the branch **before** merging (manual command below), as in earlier phases.
+
+Manual deploy, from the repo root on a machine that has the key:
 
 ```bash
 bash deploy/staging/deploy.sh 13.235.201.166 <path-to>/offer-platform.pem
 ```
 
 It uploads the **committed** source (`git archive`, so no local files and no `.env`), builds the image on the server (slow on t3.micro), runs migrations and seed, restarts api/worker, and waits for `/health/ready`.
+
+**Monitoring** (`.github/workflows/monitor.yml`, every 15 minutes, no extra vendor):
+- **checks:** `/health/ready`; `/health/worker` (the worker beats every minute); disk below 80 %; memory over 100 MB free; all 5 containers running; a backup from the last 26 hours;
+- **alerts:** a failure opens or updates a GitHub issue labelled `monitoring` (watchers get an email) and closes it when healthy again;
+- run it by hand from the Actions tab ("Monitor preview" → Run workflow).
 
 **On the server** (`ssh -i offer-platform.pem ubuntu@13.235.201.166`, then `cd /opt/offer-platform/src/deploy/staging`):
 
@@ -361,9 +372,15 @@ Images:
 ## 10. What's next (in priority order)
 
 **Decisions needed from the product owner:**
-1. **SMS vendor** + TRAI DLT registration (blocks real phone login).
+Decided 2026-10-09:
+- name **Dodoom**;
+- SMS provider **MSG91**; Craftware still has to do the TRAI DLT registration;
+- **managed database**: RDS PostgreSQL + S3, with API, worker and Valkey on EC2.
+
+Still open:
+1. **DLT registration** with MSG91 (entity, sender ID, OTP template), done by Craftware.
 2. **Maps/geocoding vendor** (Google / Ola Maps / Mapbox-OSM). Today businesses type coordinates or use "I am at the shop now".
-3. **Final product name + domain.** Moving means:
+3. **Domain**, decided later. dodoom.com is taken by someone else; dodoom.in is registered (owner to confirm whether it's ours); dodoom.app, .co.in and .co looked free on 2026-10-09. Moving means:
    - DNS: `api.<domain>` → Elastic IP, website domain → Vercel;
    - API `.env`: `API_DOMAIN`, `APP_PUBLIC_URL`, `CORS_ORIGINS`, `APP_DISPLAY_NAME`;
    - Vercel: `NEXT_PUBLIC_API_URL`.
@@ -371,7 +388,7 @@ Images:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)** is next. It needs the owner decisions above, then approval.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring. Next: browser tests in CI, off-server backups to S3 (needs the owner's OK for AWS changes), draft legal pages; then RDS + S3 images, MSG91, the domain, switch-over.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
@@ -385,7 +402,6 @@ Images:
   - no monitoring or alerting.
 
   All of this is Phase 9.
-- **API deploys are manual** (`deploy.sh`). Add a CI deploy with approval.
 - **No automated browser tests** for the website yet (add Playwright).
 - **Phone and email accounts can't be linked** into one account.
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
@@ -635,7 +651,15 @@ Images:
 - Every finding is fixed or explicitly accepted by the owner.
 - A short report is saved as `docs/security-audit-<date>.md`.
 
-### Phase 9. Production readiness (launch)
+### Phase 9. Production readiness (launch) — 🚧 Approved 2026-10-09, in progress
+
+> **Owner decisions (2026-10-09):**
+> - name **Dodoom**, domain decided later;
+> - **MSG91** for SMS;
+> - **managed database**: RDS + S3, API/worker/Valkey on EC2;
+> - decision-free work first.
+>
+> **Done:** automatic API deploys and monitoring (PR #16).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -682,6 +706,30 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-09 · PR #16 · Phase 9 (part 1): automatic API deploys and monitoring · Claude (AI agent), Phase 9 approved by the product owner 2026-10-09
+- **What changed:**
+  - **Owner decisions recorded:** name Dodoom (domain later); MSG91 for SMS; managed database (RDS + S3, API/worker/Valkey on EC2); decision-free work first.
+  - **Automatic deploys:** CI job "Deploy API to the preview server" after every green push to `main`:
+    - a dedicated deploy key (`~/.ssh/offer-platform-ci` on the owner's machine), stored by the owner as the repository secret `STAGING_SSH_KEY`;
+    - on the server it is `restrict`ed: commands only, no terminal, no port or agent forwarding;
+    - the server host key is pinned.
+  - **Worker heartbeat:** the worker writes `worker:heartbeat` to Valkey every minute; new public `GET /api/v1/health/worker` (503 after 3 minutes of silence).
+  - **Monitoring:** `.github/workflows/monitor.yml`, every 15 minutes:
+    - API ready; worker alive; disk < 80 %; memory > 100 MB; 5 containers running; backup < 26 h;
+    - alerts as a GitHub issue labelled `monitoring`, closed automatically on recovery.
+- **Why:** Phase 9, the decision-free part (releases and monitoring rows of the roadmap).
+- **How it was verified:**
+  - API 194 unit + 165 integration tests (2 new: health checks), web 30; lint, types and builds clean.
+  - The monitor's server checks were dry-run against the preview: disk 54 %, 302 MB free, 5 containers running, backup 10 h old.
+  - The restricted CI key runs commands on the server.
+  - Host key fingerprint matched from inside and outside the server (SHA256:2fKutQtn…).
+- **Deploy / migration / env notes:**
+  - No migration and no new environment variables.
+  - **Owner action:** add the repository secret `STAGING_SSH_KEY` (the contents of `~/.ssh/offer-platform-ci`). Until then the deploy job fails, and the monitor runs only its HTTP checks.
+- **Follow-ups:**
+  - Next PRs: browser tests in CI (Playwright), off-server backups to S3 (needs the owner's OK to create the bucket and role), draft legal pages.
+  - Later: RDS, S3 images, MSG91 after DLT, the domain.
 
 ### 2026-10-09 · PR #15 · Phase 8: security audit · Claude (AI agent), plan approved by the product owner 2026-10-09
 - **What changed:**

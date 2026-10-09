@@ -22,6 +22,7 @@ import {
   NotificationsScheduler,
 } from './jobs/notifications.job.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
+import { WorkerHeartbeat } from './jobs/heartbeat.js';
 import {
   MAINTENANCE_QUEUE,
   MaintenanceProcessor,
@@ -75,6 +76,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     RetentionService,
     MaintenanceProcessor,
     MaintenanceScheduler,
+    WorkerHeartbeat,
   ],
 })
 export class WorkerModule {}
