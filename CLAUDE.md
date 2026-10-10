@@ -64,7 +64,7 @@ Other rules:
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
 | 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests, off-server backups, legal pages, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests. Lint and type-check are clean. A full browser end-to-end run of the MVP flow passed on 2026-10-01 (see §8).
+**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **11 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests
 
 ---
 
@@ -169,6 +169,9 @@ pnpm --filter @offer-platform/web dev -- --port 3001  # website on http://localh
 ```bash
 pnpm turbo run lint typecheck test build              # everything, both apps
 pnpm --filter @offer-platform/api test:integration    # needs Docker (Testcontainers)
+# Browser tests: API (CORS_ORIGINS=http://localhost:3001 RATE_LIMIT_PER_IP_PER_MINUTE=5000, its log in a file),
+# worker and website running locally; then, in apps/web (once: pnpm exec playwright install chromium):
+E2E_API_LOG=<path to the API log> pnpm --filter @offer-platform/web test:e2e
 ```
 
 **Database change:** edit a module's `*.schema.ts`, then run `pnpm --filter @offer-platform/api db:generate --name=<change>`, **review the SQL** (drizzle-kit quotes PostGIS types, so unquote `geography(Point, 4326)` by hand), then `db:migrate`. Never edit a migration that has already run anywhere shared.
@@ -340,7 +343,7 @@ Images:
 
 - **Real database:** a feature is not "working" until a test passes against a real database. Integration tests use Testcontainers; never mock the database.
 - **CI must be green** before merging: lint, types, unit + integration tests, builds.
-- **Website changes:** also run the flow in a browser against a local API.
+- **Website changes:** also run the flow in a browser against a local API. The **browser tests** (`apps/web/e2e`, Playwright) cover the MVP path in CI; extend them when you add a main flow.
 - **The 2026-10-01 end-to-end run** passed on a local API + database:
   - login, register business, shop photo, submit;
   - admin verifies;
@@ -388,7 +391,7 @@ Still open:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring. Next: browser tests in CI, off-server backups to S3 (needs the owner's OK for AWS changes), draft legal pages; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI. Next: off-server backups to S3 (needs the owner's OK for AWS changes), draft legal pages; then RDS + S3 images, MSG91, the domain, switch-over.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
@@ -402,7 +405,6 @@ Still open:
   - no monitoring or alerting.
 
   All of this is Phase 9.
-- **No automated browser tests** for the website yet (add Playwright).
 - **Phone and email accounts can't be linked** into one account.
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
 - **Visitor counts are approximate.** A visitor who clears browser storage or switches browser counts again; someone who blocks storage gets a new id per page load.
@@ -457,6 +459,8 @@ Still open:
 - Nest: a `@Post` that returns data answers 201 unless it has `@HttpCode(HttpStatus.OK)`.
 - Drizzle `sql` templates expand a JS array into a parameter list: write `id IN ${ids}` (guard empty arrays), not `= ANY(${ids}::uuid[])`.
 - Stopping a background `next dev` task on Windows can leave Next's server process running on port 3001 in a broken state (blank pages, "Jest worker" errors). Find it with `netstat -ano | grep :3001` and stop that process.
+- Playwright: after `page.goto`, wait for `networkidle` before typing into a form. Otherwise React finishes loading, resets the inputs, and the form says "Please fill out this field".
+- Browser tests share one IP address across every simulated person: raise `RATE_LIMIT_PER_IP_PER_MINUTE` for the test API, or runs fail with "Too many requests".
 - Analytics days before yesterday come from `analytics_daily`. On a fresh local database, start the **worker** once (it rolls up at start-up) or the dashboards show zeros for older days.
 - Integration tests that act as an admin must use `makeAdmin(ctx, user, role)` (grants the role **and** sets up 2-step login through the API); `grantRole` alone gets `MFA_SETUP_REQUIRED`. Use `nextTotp(user)` for further codes: a code works only once.
 - In Git Bash, `node -e "..."` with backticks inside runs them as commands. Write edit scripts to a file instead (the scratchpad), as with heredocs.
@@ -659,7 +663,7 @@ Still open:
 > - **managed database**: RDS + S3, API/worker/Valkey on EC2;
 > - decision-free work first.
 >
-> **Done:** automatic API deploys and monitoring (PR #16).
+> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -678,7 +682,7 @@ Still open:
 | Secret rotation | Rotate the database password, `JWT_ACCESS_SECRET`, `OTP_HASH_SECRET` and the Gmail App Password (owner decision: at launch). After `OTP_HASH_SECRET`, run `admin:reset-mfa` for every admin so they set up 2-step login again |
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
-| Quality | Playwright browser tests in CI for the main flows; a load test of search and login |
+| Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); a load test of search and login (to do) |
 | Legal pages | Privacy policy, terms of use, contact page (text from the owner) |
 | Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
 
@@ -706,6 +710,22 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-09 · PR #17 · Phase 9 (part 2): browser tests in CI · Claude (AI agent)
+- **What changed:**
+  - **Playwright 1.63.0** in `apps/web`; tests in `apps/web/e2e`.
+  - **The MVP path in a real browser:**
+    - an admin is made Super admin with the real `grant-role` command and sets up 2-step login (a wrong code is refused);
+    - a shop registers with a photo, the admin verifies it;
+    - an offer is created (40 %) and approved;
+    - a visitor finds it by search;
+    - the admin logs in again with password + authenticator code.
+  - **Phone checks** (Pixel 7 screen): home and search with no sideways scrolling; private pages ask visitors to log in.
+  - **New CI job "Browser tests (Playwright)":** PostGIS + Valkey services; builds, migrates, seeds and starts the API, worker and website; runs the tests; keeps the report, traces and logs on failure. Preview deploys now wait for it.
+- **Why:** Phase 9 quality row (it was a known gap: "no automated browser tests").
+- **How it was verified:** 11 browser tests passed locally twice in a row; the CI job runs on this pull request.
+- **Deploy / migration / env notes:** none. The test environment raises `RATE_LIMIT_PER_IP_PER_MINUTE` (every simulated person shares one IP).
+- **Follow-ups:** a load test of search and login (Phase 9).
 
 ### 2026-10-09 · PR #16 · Phase 9 (part 1): automatic API deploys and monitoring · Claude (AI agent), Phase 9 approved by the product owner 2026-10-09
 - **What changed:**

@@ -3,3 +3,7 @@ next-env.d.ts
 *.tsbuildinfo
 .vercel
 .env*.local
+
+# Playwright browser tests (Phase 9)
+test-results/
+playwright-report/
