@@ -16,18 +16,20 @@ A local offers and business discovery platform, built, hosted and operated by **
 | 3 | Offers: 7 types, server-side pricing, price history, admin review, scheduling/expiry worker | ✅ Done: [docs/offer-workflow.md](docs/offer-workflow.md) |
 | 4 | Customer discovery (search, near me, ranking), email login, preview server | ✅ Done: [docs/api.md](docs/api.md), [docs/deployment.md](docs/deployment.md) |
 | Web | Next.js website: customer, business and admin screens ([ADR-0014](docs/adr/0014-web-app-nextjs-on-vercel.md)) | ✅ Preview live at https://dodoom.vercel.app |
+| Mobile | Android app (Expo / React Native): customers and business portal ([ADR-0019](docs/adr/0019-mobile-app-expo-react-native.md), [docs/mobile.md](docs/mobile.md)) | 🟡 Built, awaiting approval; not on Google Play yet |
 
 ## Repository layout
 
 ```
 apps/api/            Backend API (NestJS 12, TypeScript 6, Drizzle ORM, PostgreSQL + PostGIS, Valkey/Redis)
 apps/web/            Website (Next.js 16, React 19, Tailwind CSS 4): customers, business portal, admin
+apps/mobile/         Android app (Expo SDK 57, React Native 0.86): customers, business portal
 docs/                Architecture decision records and guides
 docker-compose.yml   Local PostgreSQL/PostGIS and Valkey
 .github/workflows/   CI
 ```
 
-Planned later: `apps/mobile`.
+Android builds and the Google Play release steps: [docs/mobile.md](docs/mobile.md).
 
 ## Requirements
 

@@ -1,0 +1,45 @@
+{
+  "name": "@offer-platform/mobile",
+  "version": "0.1.0",
+  "description": "Offer platform Android app (Expo / React Native): customers and business portal",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src/",
+    "test": "vitest run",
+    "export:android": "expo export --platform android"
+  },
+  "dependencies": {
+    "@expo/log-box": "^57.0.4",
+    "@expo/metro-runtime": "~57.0.16",
+    "@expo/vector-icons": "^15.1.1",
+    "@react-native-community/datetimepicker": "9.1.0",
+    "expo": "~57.0.27",
+    "expo-constants": "~57.0.21",
+    "expo-crypto": "~57.0.3",
+    "expo-font": "~57.0.4",
+    "expo-image": "~57.0.5",
+    "expo-image-picker": "~57.0.20",
+    "expo-linking": "~57.0.12",
+    "expo-location": "~57.0.20",
+    "expo-router": "~57.0.25",
+    "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.4",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "oxlint": "^1.86.0",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

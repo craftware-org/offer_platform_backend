@@ -15,3 +15,4 @@
 # Not needed to build the web app
 deploy/staging/backups
 apps/api/test
+apps/mobile
