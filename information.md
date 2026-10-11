@@ -708,7 +708,7 @@ Decided on 2026-10-09: the name **Dodoom**, **MSG91** for SMS, and a **managed d
 4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget** (a small RDS is about $15+/month, from third-party listings; to be confirmed on AWS's own pricing pages).
-7. **Android app** (built 2026-10-11): approve it (ADR-0019); confirm the permanent Play package id `com.craftware.offerplatform`; create the Google Play developer account; supply the icon and splash artwork ([docs/mobile.md](docs/mobile.md#before-a-public-release)).
+7. **Android app** (built 2026-10-11): approve it (ADR-0019); confirm the permanent Play package id `com.craftware.offerplatform`; create the Google Play developer account; review the draft privacy and terms pages ([docs/mobile.md](docs/mobile.md#before-a-public-release)).
 
 ---
 

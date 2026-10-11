@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Link from 'next/link';
 import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 import { Header } from '@/components/header';
@@ -35,7 +36,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           )}
           <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
           <footer className="mx-auto max-w-6xl px-4 py-8 text-xs text-gray-500">
-            © {meta.appName}. Offers are provided by the businesses listed.
+            © {meta.appName}. Offers are provided by the businesses listed. ·{' '}
+            <Link href="/privacy" className="underline">
+              Privacy
+            </Link>{' '}
+            ·{' '}
+            <Link href="/terms" className="underline">
+              Terms
+            </Link>
           </footer>
           </EngagementProvider>
         </AuthProvider>

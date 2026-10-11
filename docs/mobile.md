@@ -26,7 +26,8 @@ apps/mobile/
   src/components/    UI kit (ui.tsx), offer cards, forms (business, offer), image upload, date/time
   src/lib/           API client + secure session, auth, location, engagement, links, use-load
                      money.ts, offer-form.ts, types.ts, insights.ts: COPIED from apps/web/src/lib (keep in sync)
-  assets/            Icon, adaptive icon, splash (placeholders from the Expo template: replace before release)
+  assets/            Icon, adaptive icon, monochrome icon, splash (orange price tag, made by store/make-icons.cjs)
+  store/             Play listing: listing.md (texts), play-icon-512.png, play-feature-graphic.png
 ```
 
 ## Configuration
@@ -87,14 +88,14 @@ Only the product owner can do steps 1–3, because they need Craftware's own acc
    - A **personal** account created after November 2023 must first run a **closed test with at least 12 testers for 14 days in a row** before it can apply for production. Check Google's current rules when you sign up.
 2. **Create the app** in Play Console: name, default language English (India), App, Free.
 3. **App content** (Policy → App content):
-   - **Privacy policy URL:** required. Publish it on the website first (`/privacy` is linked from the app's Account screen; the page is part of Phase 9 "legal pages").
+   - **Privacy policy URL:** `<website>/privacy` (draft written from the code; the owner reviews it before the public launch). Terms: `<website>/terms`.
    - **Data safety:** see [the answers below](#data-safety-answers).
    - **Account deletion:** the app deletes accounts in Account → Delete account. For the web link, use `<website>/account` (log in → Delete account).
    - **Content rating questionnaire:** a shopping and offers app with no user-to-user chat and no gambling. Answer honestly; it usually comes out as "Everyone / 3+".
    - **Target audience:** 18+ (shop owners and adult shoppers). Do not choose ages under 13.
    - **Ads:** "No ads".
    - **Government apps / financial features / health:** none.
-4. **Store listing:**
+4. **Store listing** (texts and graphics are ready in `apps/mobile/store/`):
    - short description (80 characters);
    - full description;
    - app icon 512×512 PNG;
@@ -132,8 +133,8 @@ These are not code tasks in this app, but production depends on them:
 1. **The product owner approves the app** (CLAUDE.md §13), and with it ADR-0019.
 2. **Production API on a real domain** (Phase 9). The preview API (`*.sslip.io`) is team-only, can be reset, and writes phone codes to its log. Until then, ship to the **internal testing** track only.
 3. **Real SMS (MSG91 + DLT)**, so phone login works. Until then the app opens on email login by default (it switches to phone automatically once `/meta` reports SMS delivery).
-4. **Privacy policy and terms pages** on the website (Phase 9 legal pages). The app links to `/privacy` and `/terms`.
-5. **Brand assets:** replace the Expo template icon, adaptive icon and splash in `apps/mobile/assets/` with the Dodoom artwork.
+4. **Privacy policy and terms pages:** drafts are live at `/privacy` and `/terms`; the owner must review the wording (and the contact address) before the public launch.
+5. **Brand assets:** a simple orange price-tag icon and splash are in place; swap in a designer's artwork if the brand gets one (re-run or replace `store/make-icons.cjs` outputs).
 6. **The Android package id:** confirm `com.craftware.offerplatform` (permanent) or change it before the first upload.
 7. **App links:** publish `assetlinks.json` (step 8 above).
 
