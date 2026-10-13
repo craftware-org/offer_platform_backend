@@ -3,7 +3,7 @@ name: Monitor preview
 # Phase 9 monitoring without an extra vendor. Every 15 minutes:
 # - the API is ready (database + Valkey), the worker reported in the last 3 minutes;
 # - on the server: disk below 80 %, enough free memory, all 5 containers running, a backup from the
-#   last 26 hours.
+#   last 26 hours, and (once BACKUP_S3_BUCKET is set) an off-server S3 copy from the last 26 hours.
 # Any failure opens (or updates) a GitHub issue labelled "monitoring", which emails the watchers;
 # the issue is closed automatically when everything is fine again.
 # GitHub can delay scheduled runs by some minutes; it pauses schedules in repositories with no
@@ -52,6 +52,9 @@ jobs:
               echo "running=$(docker compose ps --status running --services < /dev/null | sort | tr "\n" " ")"
               newest=$(ls -1t backups/offer_platform-*.dump 2>/dev/null | head -1)
               echo "backupage=$(( ( $(date +%s) - $(stat -c %Y "$newest" 2>/dev/null || echo 0) ) / 3600 ))"
+              if grep -q "^BACKUP_S3_BUCKET=." .env; then
+                echo "offsiteage=$(( ( $(date +%s) - $(stat -c %Y backups/offsite-ok 2>/dev/null || echo 0) ) / 3600 ))"
+              fi
             ' 2>&1) || problems+=("Could not reach the server over SSH: $server")
             rm -f ~/.ssh/key
             disk=$(echo "$server" | sed -n 's/^disk=//p')
@@ -64,7 +67,9 @@ jobs:
               [ -n "$running" ] && ! echo " $running " | grep -q " $svc " && problems+=("Container '$svc' is not running")
             done
             [ -n "$backup" ] && [ "$backup" -gt 26 ] && problems+=("Newest backup is ${backup} hours old")
-            echo "Server: disk ${disk}% · memory available ${mem} MB · running: ${running}· newest backup ${backup} h old"
+            offsite=$(echo "$server" | sed -n 's/^offsiteage=//p')
+            [ -n "$offsite" ] && [ "$offsite" -gt 26 ] && problems+=("Newest off-server (S3) backup is ${offsite} hours old: see backups/backup.log")
+            echo "Server: disk ${disk}% · memory available ${mem} MB · running: ${running}· newest backup ${backup} h old · off-server ${offsite:-not set up} h old"
           else
             echo "STAGING_SSH_KEY is not set: server checks skipped (only the HTTP checks ran)."
           fi

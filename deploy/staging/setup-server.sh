@@ -43,6 +43,9 @@ if ! command -v docker >/dev/null; then
   sudo usermod -aG docker "$USER"
 fi
 
+echo "==> AWS CLI (official snap) for off-server backups to S3; it uses the instance's IAM role"
+command -v aws >/dev/null || [ -x /snap/bin/aws ] || sudo snap install aws-cli --classic
+
 echo "==> App folders"
 sudo mkdir -p "$APP_DIR"
 sudo chown "$USER:$USER" "$APP_DIR"
@@ -66,7 +69,7 @@ else
   echo "==> .env already exists (kept)"
 fi
 
-echo "==> Nightly database backup at 02:30 (keeps 14 days)"
+echo "==> Nightly database backup at 02:30 (keeps 14 days; also to S3 when BACKUP_S3_BUCKET is set)"
 # `crontab -l` fails when no crontab exists yet; that must not abort the script.
 ( { crontab -l 2>/dev/null || true; } | grep -v 'offer-platform backup' || true
   echo "30 2 * * * bash $STAGING/backup.sh >> $STAGING/backups/backup.log 2>&1 # offer-platform backup" ) | crontab -

@@ -35,6 +35,7 @@ ssh -i <key.pem> ubuntu@<ip> 'bash setup-server.sh <ip-with-dashes>.sslip.io'
 - installs Docker;
 - creates `/opt/offer-platform`;
 - **generates `.env` with fresh secrets on the server**;
+- installs the AWS CLI (for off-server backups);
 - schedules nightly backups.
 
 ## 3. Deploy (every release)
@@ -64,11 +65,28 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 **What it checks:**
 - `GET /api/v1/health/ready`: database and Valkey;
 - `GET /api/v1/health/worker`: the worker writes a heartbeat to Valkey every minute, and the check fails after 3 minutes of silence;
-- over SSH with the deploy key: disk below 80 %, more than 100 MB of memory available, the containers `api caddy postgres valkey worker` running, and a backup no older than 26 hours.
+- over SSH with the deploy key: disk below 80 %, more than 100 MB of memory available, the containers `api caddy postgres valkey worker` running, a backup no older than 26 hours, and (once `BACKUP_S3_BUCKET` is set) an off-server S3 copy no older than 26 hours.
 
 **Alerts:** a failure opens a GitHub issue labelled `monitoring`, or comments on the open one. The issue closes itself when all checks pass again. Watchers of the repository get these by email.
 
 **Without the `STAGING_SSH_KEY` secret,** only the two HTTP checks run.
+
+## Off-server backups (Phase 9)
+
+Every night at 02:30 (server time, UTC) `backup.sh`:
+1. writes the database dump to `backups/` on the server disk (14 days kept);
+2. when `BACKUP_S3_BUCKET` is set in the server `.env`, copies the dump to `s3://<bucket>/db/` and streams the uploaded images (the `storage` volume) as one tar to `s3://<bucket>/storage/`;
+3. touches `backups/offsite-ok`. The monitor alerts when that file is older than 26 hours. Output goes to `backups/backup.log`.
+
+**AWS setup** (done 2026-10-10, account and names in CLAUDE.md §3):
+- **Bucket** in `ap-south-1`: private (all public access blocked), default encryption (SSE-S3), versioning on, objects owned by the bucket owner.
+- **Lifecycle rule:** objects expire 30 days after they are written, older (noncurrent) versions 30 days after they are replaced, and leftover delete markers are cleaned up.
+- **IAM role** `offer-platform-backup`, attached to the `Offer-Platform` instance profile. Its only policy allows `s3:ListBucket` on the bucket and `s3:PutObject` / `s3:GetObject` on its objects. It cannot delete objects or versions, so a compromised server can't wipe the backups (overwrites keep the old version for 30 days).
+- **AWS CLI:** the official snap (`sudo snap install aws-cli --classic`, done by `setup-server.sh`). It reads the role's temporary credentials from the instance metadata, so no access keys exist anywhere.
+
+**Restore from S3:**
+- **Drill** (safe, live data untouched): `bash restore-drill.sh --from-s3`. It downloads the newest dump from the bucket, restores it into a temporary database and checks it like the local drill. It also reads the newest images tar and counts its files.
+- **Real restore:** `aws s3 cp s3://<bucket>/db/<file>.dump backups/`, then the "Restore" row below. Images: `aws s3 cp s3://<bucket>/storage/<file>.tar - | docker compose exec -T api tar -C /data/storage -xf -`.
 
 ## 4. Email login codes (Gmail)
 
@@ -86,7 +104,7 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 | Status | `docker compose ps` |
 | Logs | `docker compose logs -f --tail 100 api` (also `worker`, `caddy`) |
 | Preview login code (phone) | `docker compose logs api \| grep "DEV SMS" \| tail -1` |
-| Backup now | `bash backup.sh` → `backups/*.dump` |
+| Backup now | `bash backup.sh` → `backups/*.dump`, plus the S3 copy when `BACKUP_S3_BUCKET` is set |
 | Restore | `docker compose exec -T postgres pg_restore -U offer_platform -d offer_platform --clean < backups/<file>.dump` |
 | Restore drill (safe; live data untouched) | `bash restore-drill.sh`: restores the newest backup into a temporary database, checks PostGIS, migrations and row counts, then drops it. Run it from the file, not piped through ssh. Last run: 2026-10-09, passed |
 | Lost authenticator (emergency) | `docker compose exec api node dist/cli/reset-mfa.js --email <address>` (or `--phone`): clears that person's 2-step login and ends their sessions (ADR-0018). Normally a Super admin does this on the website |
@@ -118,6 +136,6 @@ A manual `vercel deploy` is not needed. If you ever run one, run it from the rep
 
 ## Before public launch (Phase 9)
 
-- Move PostgreSQL to RDS (PostGIS, point-in-time recovery), Valkey to ElastiCache, and images and backups to S3.
+- Move PostgreSQL to RDS (PostGIS, point-in-time recovery), Valkey to ElastiCache, and images to S3. (Off-server backup copies to S3 are done.)
 - Real SMS vendor (TRAI DLT); `PREVIEW_MODE=false`; monitoring and alerts.
 - Production deployment from CI with manual approval.
