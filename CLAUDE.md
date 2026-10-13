@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #18 Phase 9 draft legal pages
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages
 
 ---
 
@@ -391,7 +391,7 @@ Still open:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #18). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: a load test of search and login; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: a load test of search and login; then RDS + S3 images, MSG91, the domain, switch-over.
 - **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
@@ -665,7 +665,7 @@ Still open:
 > - **managed database**: RDS + S3, API/worker/Valkey on EC2;
 > - decision-free work first.
 >
-> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #18).
+> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #19).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -685,7 +685,7 @@ Still open:
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
 | Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); a load test of search and login (to do) |
-| Legal pages | ✅ Drafts at `/privacy`, `/terms`, `/contact` (PR #18), written from what the platform stores. To do: the owner's details (address, grievance officer, court city), a lawyer's review, then remove the draft notice |
+| Legal pages | ✅ Drafts at `/privacy`, `/terms`, `/contact` (PR #19), written from what the platform stores. To do: the owner's details (address, grievance officer, court city), a lawyer's review, then remove the draft notice |
 | Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
 
 **Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
@@ -713,7 +713,7 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Follow-ups:
 ```
 
-### 2026-10-13 · PR #18 · Phase 9 (part 3): draft legal pages and log rotation · Claude (AI agent), owner chose "draft, marked as draft" 2026-10-10
+### 2026-10-13 · PR #19 · Phase 9 (part 3): draft legal pages and log rotation · Claude (AI agent), owner chose "draft, marked as draft" 2026-10-10
 - **What changed:**
   - **Website:** new `/privacy`, `/terms` and `/contact` pages (server-rendered), each with a visible "Draft, under review" notice; footer links on every page; the login code step says "By continuing you agree to our Terms of use and Privacy policy".
   - **Privacy policy** written from what the platform really stores (§7): account, login security, shop details and private verification photos, saves/follows/reports, notifications, usage counts (views without the viewer, taps, searches without the searcher), location never stored, technical logs; service providers (AWS Mumbai, Vercel, Google email, SMS later); retention as in §7; rights (correct, delete account, stop emails, grievance officer, Data Protection Board).
