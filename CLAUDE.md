@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-09.**
+> **Last updated: 2026-10-13.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -62,9 +62,9 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
-| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests, off-server backups, legal pages, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
+| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, off-server backups (waiting for the IAM role), load test, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **11 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages
 
 ---
 
@@ -156,7 +156,7 @@ pnpm --filter @offer-platform/api start:dev           # API on http://localhost:
 pnpm --filter @offer-platform/api start:worker:dev    # background worker (second terminal)
 
 cp apps/web/.env.example apps/web/.env.local          # NEXT_PUBLIC_API_URL=http://localhost:3000
-pnpm --filter @offer-platform/web dev -- --port 3001  # website on http://localhost:3001
+pnpm --filter @offer-platform/web dev --port 3001     # website on http://localhost:3001 (no "--" with pnpm 12)
 ```
 
 - Add `http://localhost:3001` to `CORS_ORIGINS` in `apps/api/.env`. Values already set in the environment override the file.
@@ -328,7 +328,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 | Area | Routes |
 |---|---|
-| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe` |
+| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe`; legal (draft): `/privacy`, `/terms`, `/contact` (footer links) |
 | Account | `/login` (with the 2-step code step), `/account` (2-step login at `#two-step`, notification settings at `#notifications`) |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
 | Admin | `/admin` (review queues), `/admin/insights`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
@@ -391,7 +391,8 @@ Still open:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI. Next: off-server backups to S3 (needs the owner's OK for AWS changes), draft legal pages; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: a load test of search and login; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
@@ -459,6 +460,7 @@ Still open:
 - Nest: a `@Post` that returns data answers 201 unless it has `@HttpCode(HttpStatus.OK)`.
 - Drizzle `sql` templates expand a JS array into a parameter list: write `id IN ${ids}` (guard empty arrays), not `= ANY(${ids}::uuid[])`.
 - Stopping a background `next dev` task on Windows can leave Next's server process running on port 3001 in a broken state (blank pages, "Jest worker" errors). Find it with `netstat -ano | grep :3001` and stop that process.
+- pnpm 12 passes `--` through to the script: run `pnpm --filter @offer-platform/web dev --port 3001`, not `dev -- --port 3001` (Next then reads `--port` as a folder).
 - Playwright: after `page.goto`, wait for `networkidle` before typing into a form. Otherwise React finishes loading, resets the inputs, and the form says "Please fill out this field".
 - Browser tests share one IP address across every simulated person: raise `RATE_LIMIT_PER_IP_PER_MINUTE` for the test API, or runs fail with "Too many requests".
 - Analytics days before yesterday come from `analytics_daily`. On a fresh local database, start the **worker** once (it rolls up at start-up) or the dashboards show zeros for older days.
@@ -663,7 +665,7 @@ Still open:
 > - **managed database**: RDS + S3, API/worker/Valkey on EC2;
 > - decision-free work first.
 >
-> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17).
+> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #19).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -683,7 +685,7 @@ Still open:
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
 | Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); a load test of search and login (to do) |
-| Legal pages | Privacy policy, terms of use, contact page (text from the owner) |
+| Legal pages | ✅ Drafts at `/privacy`, `/terms`, `/contact` (PR #19), written from what the platform stores. To do: the owner's details (address, grievance officer, court city), a lawyer's review, then remove the draft notice |
 | Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
 
 **Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
@@ -710,6 +712,20 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-13 · PR #19 · Phase 9 (part 3): draft legal pages and log rotation · Claude (AI agent), owner chose "draft, marked as draft" 2026-10-10
+- **What changed:**
+  - **Website:** new `/privacy`, `/terms` and `/contact` pages (server-rendered), each with a visible "Draft, under review" notice; footer links on every page; the login code step says "By continuing you agree to our Terms of use and Privacy policy".
+  - **Privacy policy** written from what the platform really stores (§7): account, login security, shop details and private verification photos, saves/follows/reports, notifications, usage counts (views without the viewer, taps, searches without the searcher), location never stored, technical logs; service providers (AWS Mumbai, Vercel, Google email, SMS later); retention as in §7; rights (correct, delete account, stop emails, grievance officer, Data Protection Board).
+  - **Terms of use:** free service, 18+, rules for shops and for everyone, "verified" is a check not a guarantee, liability as far as the law allows, Indian law.
+  - **Owner's details** in one file, `apps/web/src/lib/legal.ts`; missing ones show "[… : to be provided]".
+  - **Server log rotation:** the API's request logs record visitors' IP addresses and were never deleted. Every container now rotates its Docker logs (json-file, 5 × 10 MB), so the privacy policy's "deleted automatically" is true.
+  - **Browser test:** the legal pages open from the footer and show the draft notice (desktop + phone): 13 browser tests.
+  - **Handbook fix:** the website dev command is `dev --port 3001` (pnpm 12 passes `--` through).
+- **Why:** Phase 9 legal-pages row; the owner chose drafts marked as drafts.
+- **How it was verified:** web lint, types, 30 unit tests; the new browser test on desktop and phone against a local API; pages checked in a browser at 375 px (no sideways scroll); compose file validated (`docker compose config`: all 6 services rotate).
+- **Deploy / migration / env notes:** no migration, no new environment variables. The log rotation applies when the containers are recreated by the next API deploy.
+- **Follow-ups:** the owner provides the registered address, grievance officer and court city, and confirms the 18+ rule; a lawyer reviews; then remove the draft notice.
 
 ### 2026-10-09 · PR #17 · Phase 9 (part 2): browser tests in CI · Claude (AI agent)
 - **What changed:**
