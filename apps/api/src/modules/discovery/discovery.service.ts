@@ -163,29 +163,32 @@ export class DiscoveryService {
       discount: [sql`${offers.discountPercent} desc nulls last`],
     }[sort];
 
-    const from = () =>
-      this.db
-        .select({ id: offers.id, distanceM })
-        .from(offers)
-        .innerJoin(businesses, eq(businesses.id, offers.businessId))
-        .innerJoin(businessLocations, eq(businessLocations.businessId, businesses.id))
-        .innerJoin(categories, eq(categories.id, offers.categoryId));
     const where = and(...filters);
 
-    const [rows, [total]] = await Promise.all([
-      from()
-        .where(where)
-        .orderBy(...order, desc(offers.id))
-        .limit(query.pageSize)
-        .offset(offsetOf(query)),
-      this.db
-        .select({ value: count() })
-        .from(offers)
-        .innerJoin(businesses, eq(businesses.id, offers.businessId))
-        .innerJoin(businessLocations, eq(businessLocations.businessId, businesses.id))
-        .innerJoin(categories, eq(categories.id, offers.categoryId))
-        .where(where),
-    ]);
+    // One pass over the matching offers: the page and, through a window, the total. The text
+    // filters are the expensive part of a search (load test 2026-10-13), so they run once. Only a
+    // page past the last result has no row to carry the total, and then it is counted separately.
+    const rows = await this.db
+      .select({ id: offers.id, distanceM, total: sql<number>`count(*) over ()`.mapWith(Number) })
+      .from(offers)
+      .innerJoin(businesses, eq(businesses.id, offers.businessId))
+      .innerJoin(businessLocations, eq(businessLocations.businessId, businesses.id))
+      .innerJoin(categories, eq(categories.id, offers.categoryId))
+      .where(where)
+      .orderBy(...order, desc(offers.id))
+      .limit(query.pageSize)
+      .offset(offsetOf(query));
+    const countAll = async () =>
+      (
+        await this.db
+          .select({ value: count() })
+          .from(offers)
+          .innerJoin(businesses, eq(businesses.id, offers.businessId))
+          .innerJoin(businessLocations, eq(businessLocations.businessId, businesses.id))
+          .innerJoin(categories, eq(categories.id, offers.categoryId))
+          .where(where)
+      )[0]!.value;
+    const total = rows.length ? rows[0]!.total : query.page > 1 ? await countAll() : 0;
 
     const bundles = await this.reader.bundles(rows.map((r) => r.id));
     const distanceById = new Map(rows.map((r) => [r.id, r.distanceM]));
@@ -207,7 +210,7 @@ export class DiscoveryService {
       sort,
       needsLocation: parsed.nearMe && !point,
     };
-    return new Page(items, query, total?.value ?? 0, { interpretation });
+    return new Page(items, query, total, { interpretation });
   }
 
   /** Home screen sections (spec §7). Trending and followed businesses arrive with engagement (Phase 5). */
