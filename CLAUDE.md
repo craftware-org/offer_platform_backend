@@ -62,9 +62,9 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
-| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, off-server backups (waiting for the IAM role), load test, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
+| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 194 unit + 166 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -72,7 +72,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test
 
 ---
 
@@ -391,7 +391,7 @@ Still open:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: a load test of search and login; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: RDS + S3 images, MSG91, the domain, switch-over.
 - **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
@@ -478,6 +478,7 @@ Still open:
 ## 12. Document index
 
 - [docs/security-audit-2026-10-09.md](docs/security-audit-2026-10-09.md): Phase 8 audit, every finding and its status.
+- [docs/load-test.md](docs/load-test.md): load test of search and login (method, results, how to re-run).
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
@@ -665,7 +666,7 @@ Still open:
 > - **managed database**: RDS + S3, API/worker/Valkey on EC2;
 > - decision-free work first.
 >
-> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #19).
+> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #19); load test (PR #20).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -684,7 +685,7 @@ Still open:
 | Secret rotation | Rotate the database password, `JWT_ACCESS_SECRET`, `OTP_HASH_SECRET` and the Gmail App Password (owner decision: at launch). After `OTP_HASH_SECRET`, run `admin:reset-mfa` for every admin so they set up 2-step login again |
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
-| Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); a load test of search and login (to do) |
+| Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); ✅ load test of search and login (PR #20, [docs/load-test.md](docs/load-test.md)): one preview-sized server handles about 45 searches and 20 logins a second |
 | Legal pages | ✅ Drafts at `/privacy`, `/terms`, `/contact` (PR #19), written from what the platform stores. To do: the owner's details (address, grievance officer, court city), a lawyer's review, then remove the draft notice |
 | Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
 
@@ -712,6 +713,17 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-13 · PR #20 · Phase 9 (part 4): load test of search and login, search twice as fast · Claude (AI agent)
+- **What changed:**
+  - **Load test** (`apps/api/test/load`, `pnpm --filter @offer-platform/api test:load`, autocannon 8.0.0 as a dev dependency): home sections, search with 20 real phrases, near me, offer page and password login, at 10 and 50 simultaneous users, each request from a random IP. `seed.sql` adds 300 shops / 3,000 live offers (refuses to run without the local e2e accounts); `cleanup.sql` removes them.
+  - **Search speed-up:** every search ran its text matching twice (page + count) and PostgreSQL hit 100 % CPU. The total now comes from the same query (`count(*) over ()`); a separate count runs only for a page past the last result. Search 24 → 45 requests a second (median 402 → 206 ms); near me 74 → 111.
+  - New integration test: the same total on every page, past the last page, and 0 when nothing matches.
+  - **Report:** [docs/load-test.md](docs/load-test.md).
+- **Why:** Phase 9 quality row (load test of search and login), approved with "Finish Phase 9" on 2026-10-13.
+- **How it was verified:** run against the production Docker image limited to t3.micro's 2 vCPUs / 1 GB (API and PostgreSQL 1 CPU + 512 MB each); 0 errors in the final run. API lint, types, 194 unit tests, discovery integration tests (14).
+- **Deploy / migration / env notes:** none. The search change is backward compatible (same response).
+- **Follow-ups (not needed for launch):** index-friendly text matching (pg_trgm operators), cache home sections in Valkey, re-run the test after the RDS move.
 
 ### 2026-10-13 · PR #19 · Phase 9 (part 3): draft legal pages and log rotation · Claude (AI agent), owner chose "draft, marked as draft" 2026-10-10
 - **What changed:**

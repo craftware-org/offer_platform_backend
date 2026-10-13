@@ -139,6 +139,26 @@ describe('Discovery: search, filters, nearby, ranking (real PostGIS + full-text 
     expect(titles(res)).toEqual(['ಸೀರೆ ಮೇಲೆ 50% ರಿಯಾಯಿತಿ']);
   });
 
+  it('reports the same total on every page, also past the last one, and 0 when nothing matches', async () => {
+    const all = await discover({ pageSize: 50 }).expect(200);
+    const total = all.body.data.length;
+    expect(all.body.meta.totalItems).toBe(total);
+    expect(total).toBeGreaterThan(2);
+
+    const first = await discover({ pageSize: 2, page: 1 }).expect(200);
+    expect(first.body.data).toHaveLength(2);
+    expect(first.body.meta.totalItems).toBe(total);
+    const second = await discover({ pageSize: 2, page: 2 }).expect(200);
+    expect(second.body.meta.totalItems).toBe(total);
+    const pastTheEnd = await discover({ pageSize: 2, page: 99 }).expect(200);
+    expect(pastTheEnd.body.data).toEqual([]);
+    expect(pastTheEnd.body.meta.totalItems).toBe(total);
+
+    const none = await discover({ q: 'zzqx nothing matches this' }).expect(200);
+    expect(none.body.data).toEqual([]);
+    expect(none.body.meta.totalItems).toBe(0);
+  });
+
   it('"offers near me" without a location asks the app for one', async () => {
     const res = await discover({ q: 'offers near me' }).expect(200);
     expect(res.body.meta.interpretation).toMatchObject({ nearMe: true, needsLocation: true });
