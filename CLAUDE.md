@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-13.**
+> **Last updated: 2026-10-14.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -42,7 +42,7 @@ Other rules:
 - **Business model:** the MVP is **free**. Future platform fees (business plans, sponsored offers etc.) will be admin-managed in the database and kept behind feature flags that default to `false`. Nothing paid is built yet.
 - **Clients:**
   - **Website** (`apps/web`): customers, business portal and admin screens, all in one Next.js app. Live.
-  - **Mobile apps:** planned later (`apps/mobile`); they will use the same API and its OpenAPI contract.
+  - **Android app** (`apps/mobile`): Expo / React Native, customers and business portal, same API ([ADR-0019](docs/adr/0019-mobile-app-expo-react-native.md), [docs/mobile.md](docs/mobile.md)). Built 2026-10-11, **not released**: needs the product owner's approval and the Phase 9 items in docs/mobile.md. iOS later.
 
 ---
 
@@ -63,8 +63,9 @@ Other rules:
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
 | 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
+| Mobile | **Android app** (`apps/mobile`, Expo SDK 57): customer screens, login, saved/following, inbox, full business portal; Google Play guide in [docs/mobile.md](docs/mobile.md) (ADR-0019, proposed) | 🟡 Built 2026-10-11 on a team member's request; **awaiting owner approval**, not released |
 
-**Tests (all must stay green):** API 194 unit + 166 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 194 unit + 166 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **mobile 27 unit tests** plus a full Android Metro bundle check; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -129,6 +130,12 @@ apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind C
   src/components/         Forms (business, offer), cards, moderation panel, image upload, auth image…
   src/lib/                api client + session, auth context, types, money, time, location, offer-form
   src/proxy.ts            Per-request CSP nonce (Next 16 "proxy" = old middleware)
+apps/mobile/              Android app: Expo SDK 57, React Native 0.86, Expo Router (ADR-0019, docs/mobile.md)
+  app.config.ts, eas.json Package id, permissions, deep links; EAS build profiles and Play submission
+  src/app/                Screens; paths copy the website's (/offers/:slug, /business/:id …), tabs in (tabs)/
+  src/components/         UI kit, offer cards, business/offer forms, image upload (camera/gallery), date/time
+  src/lib/                api client + secure-store session, auth, location, engagement, links;
+                          money/offer-form/types/insights COPIED from apps/web/src/lib (keep in sync)
 deploy/staging/           EC2 preview server: docker-compose, Caddyfile, setup-server.sh, deploy.sh,
                           set-secret.sh, backup.sh, restore-drill.sh, .env.example
 docs/                     ADRs (docs/adr) and guides (api, auth, authorization, database, business/offer
@@ -164,10 +171,12 @@ pnpm --filter @offer-platform/web dev --port 3001     # website on http://localh
 - First admin locally: log in once, then `pnpm --filter @offer-platform/api admin:grant-role --email you@example.com --role SUPER_ADMIN` (or `--phone`).
 - Areas locally: `pnpm --filter @offer-platform/api admin:add-localities --city hubballi --names "Vidya Nagar,Keshwapur"`.
 
+**Android app:** see [docs/mobile.md](docs/mobile.md) (needs a development build from EAS; point it at the API with `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000` on the emulator).
+
 **Tests and checks:**
 
 ```bash
-pnpm turbo run lint typecheck test build              # everything, both apps
+pnpm turbo run lint typecheck test build              # everything: API, website, Android app
 pnpm --filter @offer-platform/api test:integration    # needs Docker (Testcontainers)
 # Browser tests: API (CORS_ORIGINS=http://localhost:3001 RATE_LIMIT_PER_IP_PER_MINUTE=5000, its log in a file),
 # worker and website running locally; then, in apps/web (once: pnpm exec playwright install chromium):
@@ -389,6 +398,7 @@ Still open:
    - Vercel: `NEXT_PUBLIC_API_URL`.
 4. **MVP launch date.** Push provider (FCM proposed) when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
+6. **Android app (built 2026-10-11, ADR-0019 proposed):** approve it; confirm the permanent package id `com.craftware.offerplatform`; create the Google Play developer account (organisation account needs a D-U-N-S number; personal accounts must run a 12-tester, 14-day closed test first); review the draft `/privacy` and `/terms` pages. Full list: [docs/mobile.md](docs/mobile.md#before-a-public-release).
 
 **Product work (each needs approval first):**
 - **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: RDS + S3 images, MSG91, the domain, switch-over.
@@ -407,6 +417,7 @@ Still open:
 
   All of this is Phase 9.
 - **Phone and email accounts can't be linked** into one account.
+- **Android app helpers are copied** from `apps/web/src/lib` (`money`, `offer-form`, `types`, `insights`): change both until a `packages/shared` exists. The app has no push notifications yet (inbox polled every minute while open).
 - **Old personal Vercel project** `dodoom` can be deleted by the owner.
 - **Visitor counts are approximate.** A visitor who clears browser storage or switches browser counts again; someone who blocks storage gets a new id per page load.
 - **`/me/businesses/:id/engagement` taps** are all-time counts of raw events, which now cover only 180 days. The website uses the insights endpoint; mobile apps should too.
@@ -445,6 +456,13 @@ Still open:
 - oxlint: the React `set-state-in-effect` rule is off on purpose (data-loading effects).
 - The header has many links: keep its rows `flex-wrap` and check a 375 px width (it overflowed after Phase 5 until Phase 6 fixed it).
 
+**Android app (Expo, learned 2026-10-11)**
+- Add native libraries with versions from `node_modules/expo/bundledNativeModules.json` (that is what `npx expo install` uses; it needs api.expo.dev, which some networks block).
+- Don't create or commit `apps/mobile/android/`: EAS generates it from `app.config.ts` on every build (`expo prebuild` locally is fine to inspect the manifest, then delete it).
+- The splash screen is configured through the `expo-splash-screen` plugin; the old top-level `splash` key no longer exists in SDK 57.
+- Never put a secret in `EXPO_PUBLIC_*` or `app.config.ts`: everything is readable inside the APK.
+- `.vercelignore` excludes `apps/mobile` so the website build does not upload it.
+
 **Windows and tools**
 - Mark shell scripts executable in git with `git update-index --chmod=+x`; Windows loses the bit and the server then refuses to run them.
 - Git Bash rewrites `/v9/...` paths. Use `MSYS_NO_PATHCONV=1 vercel api ...`.
@@ -482,7 +500,8 @@ Still open:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0018).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0019).
+- Android app: [docs/mobile.md](docs/mobile.md) (structure, builds, Google Play step by step, data safety answers).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -693,7 +712,7 @@ Still open:
 
 ### Later (not scheduled)
 
-- **Mobile apps** (`apps/mobile`), using the same API and OpenAPI contract.
+- **Mobile apps:** the **Android app is built** (`apps/mobile`, 2026-10-11, awaiting approval; see §2 and docs/mobile.md). Still to do: push notifications (FCM), iOS, a shared helpers package, device tests.
 - **One account with both phone and email** (account linking).
 - **Address search on a map** (needs the maps provider).
 - **Kannada user interface** (search already understands Kannada).
@@ -738,6 +757,42 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - **How it was verified:** web lint, types, 30 unit tests; the new browser test on desktop and phone against a local API; pages checked in a browser at 375 px (no sideways scroll); compose file validated (`docker compose config`: all 6 services rotate).
 - **Deploy / migration / env notes:** no migration, no new environment variables. The log rotation applies when the containers are recreated by the next API deploy.
 - **Follow-ups:** the owner provides the registered address, grievance officer and court city, and confirms the 18+ rule; a lawyer reviews; then remove the draft notice.
+
+### 2026-10-11 · PR #18 · Android app (`apps/mobile`) · Claude (AI agent), requested by a team member; needs the product owner's approval
+- **What changed:**
+  - **New workspace package `@offer-platform/mobile`:** Expo SDK 57, React Native 0.86, Expo Router, TypeScript; ADR-0019 (proposed).
+  - **Customer screens:** home sections with GPS or city and radius, search (interpretation, sorts, endless list), offer page (save, share sheet, call / WhatsApp / directions / website, report), shop page (follow, hours, gallery), saved (still on / ended), shops you follow, notification inbox and settings.
+  - **Account:** password or code login (phone/email), forgot password, admin 2-step step, welcome step, profile, set/change password, log out, delete account. Admins are linked to the website for admin screens.
+  - **Business portal:** my shops, register/edit shop (camera "I am at the shop now", hours), dashboard with verification photos (camera or gallery), submit, logo and gallery, 30-day stats and warnings, offers; create/edit offers (7 types, native date and time pickers), manage offers (submit/withdraw/pause/resume/end, photos, delete draft), performance (7/30/90 days, daily chart, per offer).
+  - **Session:** access token in memory; refresh token in `expo-secure-store` (ADR-0006); a single shared refresh request; views and taps counted with a random visitor id. GPS is rounded and kept in memory only.
+  - **Android config:** package `com.craftware.offerplatform`; only location and camera permissions (background location, microphone and storage removed); App Links for `/offers/` and `/businesses/` on the website host; EAS profiles `development` / `preview` (APK) / `production` (AAB, auto version code) and Play submission to the internal track.
+  - **docs/mobile.md:** layout, configuration, builds, Google Play step by step, data safety answers, release prerequisites.
+  - **`.vercelignore`:** excludes `apps/mobile`.
+  - **Play Store prerequisites:** app icon, adaptive and monochrome icons and splash (an orange price tag, generated by `apps/mobile/store/make-icons.cjs`); Play listing texts and graphics in `apps/mobile/store/`. The app's Account screen links to the website's `/privacy` and `/terms` (the PR #19 pages, which replaced this PR's own drafts in the merge with `main`; the privacy page now also names the Android app).
+- **Why:** a team member asked for an Android app (customers and business portal) for Google Play.
+- **How it was verified:**
+  - `pnpm turbo run lint typecheck test build` is green for all apps (11 tasks).
+  - Mobile has 27 unit tests (money, pricing, insights, link routing).
+  - `expo export --platform android` bundles all 1,355 modules to Hermes bytecode.
+  - `expo prebuild` produced the expected manifest (permissions, App Links, package id); the generated folder was deleted.
+  - **Runtime walkthrough:** the app was rendered with react-native-web in headless Chromium (Pixel-size viewport; react-native-web was installed only for this check, not committed). It ran against the real API (migrations and seed on local PostgreSQL 16 + PostGIS, Redis).
+  - In that walkthrough, 34 steps covered every screen: password login with return to the requested screen, save, follow, a notification opening its screen, creating an offer through the form, submitting it for review (server headline "20% OFF"), and sending a report. There were no page errors, console errors or failed API calls.
+  - Two bugs found this way were fixed: a missing "back to home" for deep-linked screens, and login returning to Home instead of the edit screens.
+  - Not yet done: a run on a real Android device or emulator. EAS builds need the team's Expo account.
+- **Deploy / migration / env notes:**
+  - No API or database changes.
+  - The app reads `EXPO_PUBLIC_API_URL` / `EXPO_PUBLIC_WEB_URL` at build time (set per profile in `eas.json`), plus `APP_DISPLAY_NAME`, `ANDROID_PACKAGE` and `EAS_PROJECT_ID`.
+  - Play submission needs `apps/mobile/play-service-account.json` (git-ignored).
+- **Follow-ups:**
+  - Owner approval (ADR-0019).
+  - Expo account + `eas init`.
+  - Google Play developer account.
+  - The legal pages' open items from PR #19 (address, grievance officer, lawyer review).
+  - `assetlinks.json` on the website after Play App Signing.
+  - Push notifications (FCM).
+  - `packages/shared` for the copied helpers.
+  - A device test run (Maestro or similar).
+  - A public release waits for Phase 9: production domain, MSG91 SMS, legal pages.
 
 ### 2026-10-09 · PR #17 · Phase 9 (part 2): browser tests in CI · Claude (AI agent)
 - **What changed:**

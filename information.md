@@ -9,7 +9,7 @@
 > - This file is the *reference*: what the product is and how it is built.
 > - Deeper technical detail: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/](docs/), [docs/adr/](docs/adr/README.md).
 >
-> **Last updated:** 2026-10-09. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
+> **Last updated:** 2026-10-11. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
 
 ---
 
@@ -155,6 +155,7 @@ Everything else in the specification (statuses, server-side discount calculation
 | Logging | **pino** (nestjs-pino) | Coordinates, phone numbers and auth headers are masked |
 | Security headers | **helmet**; website: nonce-based CSP | |
 | Website | **Next.js 16**, **React 19**, **Tailwind CSS 4** | Server-rendered public pages; logged-in screens in the browser |
+| Android app | **Expo SDK 57**, **React Native 0.86**, **Expo Router** (ADR-0019, proposed) | Built 2026-10-11, not released; refresh token in secure storage; built and signed by EAS; see [docs/mobile.md](docs/mobile.md) |
 | Tests | **Vitest 4**, **Testcontainers** (real PostGIS + Valkey), supertest | Each integration test file gets its own database |
 | Lint | **oxlint** | |
 | CI | **GitHub Actions** (Ubuntu 24.04) | Lint, types, unit + integration tests, builds, OpenAPI export |
@@ -183,7 +184,7 @@ Everything else in the specification (statuses, server-side discount calculation
 ```
 
 **Principles:**
-- **API-first:** the website, and later the mobile apps, use exactly the same API. The OpenAPI contract is exported by CI.
+- **API-first:** the website and the Android app use exactly the same API. The OpenAPI contract is exported by CI.
 - **Modules only talk through exported services, never each other's tables.** For example, the admin activity feed asks each module for display names through `labelsFor(ids)`.
 - **The backend decides everything that matters:** permissions, prices, discount percentages and status changes. The website only hides buttons.
 - **Nothing important is ever hard-deleted:** offers, businesses, audit history. Accounts are anonymized on deletion.
@@ -194,6 +195,7 @@ Everything else in the specification (statuses, server-side discount calculation
 apps/api        backend: API + worker, migrations, CLI commands, tests
 apps/web        website: customers, business portal, admin
 deploy/staging  preview server: Docker Compose, Caddy, setup/deploy/backup/secret scripts
+apps/mobile     Android app: customers + business portal (Expo / React Native, ADR-0019)
 docs/           guides + ADRs
 CLAUDE.md       working handbook (status, operations, change log; must be kept current)
 information.md  this file
@@ -431,6 +433,16 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 - `GET /meta` tells apps the brand name, whether this is a preview, which login methods deliver codes, the radius options and the feature flags.
 - `GET /health` and `GET /health/ready` check the database and Valkey.
 
+### The Android app (`apps/mobile`)
+- **Built 2026-10-11** on a team member's request; **awaiting the product owner's approval** and **not released** (ADR-0019 is proposed).
+- **Screens:**
+  - customers: home sections, search, offer and shop pages with save / share / call / WhatsApp / directions, report, saved, following, notifications;
+  - account: password or code login, welcome step, profile, password, delete account;
+  - the full **business portal**: register a shop, verification photos from the camera, offers of all 7 types, offer actions, performance.
+- **Admin screens are not in the app:** admins are linked to the website.
+- **Same rules as the website:** server-side pricing, views and taps counted with a random visitor id, GPS rounded and sent per request only.
+- **Google Play:** the step-by-step guide and the data safety answers are in [docs/mobile.md](docs/mobile.md). A public release needs Phase 9 first: production domain, MSG91 SMS and legal pages.
+
 ### The website (`apps/web`)
 | Area | Pages |
 |---|---|
@@ -569,7 +581,8 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
 | 8 | **Security audit:** ASVS L2 review ([report](docs/security-audit-2026-10-09.md)), admin 2-step login, every-route permission test, complete account deletion, retention clean-up, dependency fixes, backup restore drill | ✅ Done 2026-10-09 (secrets rotate at launch) | — |
 | 9 | **Production readiness (in progress; automatic deploys, monitoring, browser tests, draft legal pages at /privacy, /terms, /contact and a load test (about 45 searches and 20 logins a second on a t3.micro-sized setup, docs/load-test.md) done):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
-| Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
+| Mobile | **Android app** (`apps/mobile`): customers + business portal ([docs/mobile.md](docs/mobile.md)) | 🟡 Built 2026-10-11, awaiting owner approval; not released | Owner approval; Google Play account; Phase 9 (domain, SMS, legal pages) for a public release |
+| Later | Push notifications in the app (FCM); iOS app; phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
 The detailed plan for each pending phase (screens, server work, "done when") is in [CLAUDE.md §13 Roadmap](CLAUDE.md).
@@ -695,6 +708,7 @@ Decided on 2026-10-09: the name **Dodoom**, **MSG91** for SMS, and a **managed d
 4. **Push notification provider** (FCM proposed), when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad, replacing the starter test list.
 6. **MVP launch date** and **AWS budget** (a small RDS is about $15+/month, from third-party listings; to be confirmed on AWS's own pricing pages).
+7. **Android app** (built 2026-10-11): approve it (ADR-0019); confirm the permanent Play package id `com.craftware.offerplatform`; create the Google Play developer account; review the draft privacy and terms pages ([docs/mobile.md](docs/mobile.md#before-a-public-release)).
 
 ---
 

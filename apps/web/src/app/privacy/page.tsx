@@ -45,7 +45,7 @@ export default async function PrivacyPage() {
           <li>
             <strong>Usage counts:</strong> we count views of offer and shop pages <em>without</em> recording who viewed
             them. We count taps on Call, WhatsApp, Directions, Website and Share together with your account, or with a
-            random visitor number kept in your browser if you are not logged in. We record what people search for, with the
+            random visitor number kept in your browser (or in the Android app) if you are not logged in. We record what people search for, with the
             city and the number of results, without recording who searched; numbers of 5 or more digits and email addresses
             are removed from the search text. Shops see totals only, never who you are.
           </li>
@@ -60,7 +60,7 @@ export default async function PrivacyPage() {
           </li>
         </ul>
         <p>
-          In your browser we keep only your login (so you stay logged in) and the random visitor number. We use no
+          In your browser, or in the Android app's secure storage on your phone, we keep only your login (so you stay logged in), the random visitor number and, in the app, the city you chose. The app asks for your location and camera only when you use them. We use no
           advertising cookies and no third-party trackers.
         </p>
       </Section>
