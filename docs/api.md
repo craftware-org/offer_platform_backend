@@ -95,10 +95,11 @@ See [business-workflow.md](business-workflow.md) for the full flow. `:id` values
 | POST | `/me/businesses/:id/images?kind=` | owner/staff | Upload `LOGO`, `GALLERY`, `VERIFICATION_SHOP`, `VERIFICATION_OWNER` |
 | DELETE | `/me/businesses/:id/images/:imageId` | owner/staff | Delete an image |
 | GET | `/me/businesses/:id/images/:imageId/:variant` | owner/staff | Any own image, including verification photos |
-| GET | `/admin/businesses` | `businesses:read` | List/search; `?status=UNDER_REVIEW` is the review queue |
+| GET | `/admin/businesses` | `businesses:read` | List/search; `?status=UNDER_REVIEW` is the review queue; `?listed=true` only platform listings |
+| POST | `/admin/businesses/listings` | `businesses:manage` | List a shop from the brand's public page (ADR-0019): business fields + `sourceUrl`; public at once, `isVerified: false`, `listedByPlatform: true`; the admin becomes its owner |
 | GET | `/admin/businesses/:id` | `businesses:read` | Full detail incl. private photos |
 | PATCH | `/admin/businesses/:id/status` | `businesses:verify` / `businesses:manage` | `VERIFY`, `REJECT`, `SUSPEND`, `REACTIVATE` |
-| PATCH | `/admin/businesses/:id` | `businesses:manage` | Edit any field (audited) |
+| PATCH | `/admin/businesses/:id` | `businesses:manage` | Edit any field (audited); also `sourceUrl` of a platform listing |
 | GET | `/admin/businesses/:id/images/:imageId/:variant` | `businesses:read` | Private verification photos |
 | GET / POST / PATCH / PUT | `/admin/categories`, `/admin/categories/:id`, `/admin/categories/order` | `categories:manage` | Manage and reorder categories |
 | GET / POST / PATCH | `/admin/cities…`, `/admin/localities/:id` | `locations:manage` | Manage cities and localities |

@@ -113,6 +113,30 @@ test('a visitor finds the offer by search and opens it', async ({ browser }) => 
   await expect(visitor.getByText(SHOP).first()).toBeVisible();
 });
 
+test('an admin lists a chain outlet from its brand page and visitors see it as listed, not verified', async ({ browser }) => {
+  const listed = `E2E Burger Corner ${run}`;
+  await admin.goto('/admin/listings');
+  await admin.waitForLoadState('networkidle'); // the form must be hydrated before typing
+  await admin.getByRole('button', { name: 'List a shop' }).click();
+  await admin.locator('#b-source').fill('https://www.example.com/offers');
+  await admin.locator('#b-name').fill(listed);
+  await admin.locator('#b-cat').selectOption({ label: 'Fast Food' });
+  await admin.locator('#b-phone').fill('0836 225 5000');
+  await admin.locator('#b-a1').fill('Ground floor, Unkal Cross');
+  await admin.locator('#b-city').selectOption({ label: 'Hubballi' });
+  await admin.locator('#b-lat').fill('15.3602');
+  await admin.locator('#b-lng').fill('75.1301');
+  await admin.getByRole('button', { name: 'List this shop' }).click();
+  await admin.waitForURL(/\/business\/[0-9a-f-]{36}$/);
+
+  const visitor = await newPage(browser);
+  await visitor.goto(`/businesses/e2e-burger-corner-${run}-hubballi`);
+  await expect(visitor.getByRole('heading', { name: listed })).toBeVisible();
+  await expect(visitor.getByTestId('listed-notice')).toContainText("from the brand's public information");
+  await expect(visitor.getByRole('link', { name: "brand's own page" })).toHaveAttribute('href', 'https://www.example.com/offers');
+  await expect(visitor.getByText('✓ Verified')).toHaveCount(0);
+});
+
 test('logging in again asks the admin for the authenticator code', async ({ browser }) => {
   const again = await newPage(browser);
   await again.goto('/login');

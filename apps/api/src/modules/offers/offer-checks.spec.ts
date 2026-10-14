@@ -39,4 +39,18 @@ describe('assertReadyForReview', () => {
       assertReadyForReview({ startsAt: days(-10), expiresAt: days(-1) }, verified, limits, now),
     ).toThrow(expect.objectContaining({ fields: { expiresAt: 'The end date has already passed' } }));
   });
+
+  it('limits offers of platform listings to a week', () => {
+    const listed = { status: 'VERIFIED' as const, listedByPlatform: true };
+    expect(() =>
+      assertReadyForReview({ startsAt: now, expiresAt: days(7) }, listed, limits, now),
+    ).not.toThrow();
+    expect(() => assertReadyForReview({ startsAt: now, expiresAt: days(8) }, listed, limits, now)).toThrow(
+      'not ready for review',
+    );
+    const shorter = { maxDurationDays: 3, maxImages: 5 };
+    expect(() => assertReadyForReview({ startsAt: now, expiresAt: days(5) }, listed, shorter, now)).toThrow(
+      'not ready for review',
+    );
+  });
 });

@@ -27,6 +27,11 @@ export default async function TermsPage() {
           We do not sell the products or services in the offers. Each offer is made by the shop that published it, and any
           purchase is between you and that shop.
         </p>
+        <p>
+          Some shops are <strong>listed by us</strong> from the brand&rsquo;s own public information, not by the shop. They
+          are marked as listed, never as verified, and link to the brand&rsquo;s page. Their offers can differ between
+          outlets and change without notice, so check with the brand or the shop before you rely on them.
+        </p>
       </Section>
 
       <Section title="2. Your account">

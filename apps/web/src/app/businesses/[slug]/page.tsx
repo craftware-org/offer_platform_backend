@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 import { ContactLinks, FollowButton } from '@/components/engagement-buttons';
 import { OfferGrid } from '@/components/offer-card';
 import { apiUrl } from '@/lib/config';
-import { serverGet } from '@/lib/server-api';
+import { getAppMeta, serverGet } from '@/lib/server-api';
 import type { Day, PublicBusiness, PublicOffer } from '@/lib/types';
+import { ListedNotice } from '@/components/listed-notice';
 import { TrackView } from '@/components/track-view';
 
 type Props = { params: Promise<{ slug: string }> };
@@ -68,6 +69,8 @@ export default async function BusinessPage({ params }: Props) {
           </div>
         </div>
       </header>
+
+      {b.listedByPlatform && <ListedNotice appName={(await getAppMeta()).appName} sourceUrl={b.sourceUrl} />}
 
       {b.description && <p className="whitespace-pre-line text-gray-700">{b.description}</p>}
 

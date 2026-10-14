@@ -70,6 +70,13 @@ export const businesses = pgTable(
     submittedAt: timestamptz('submitted_at'),
     verifiedAt: timestamptz('verified_at'),
     verifiedBy: uuid('verified_by').references(() => users.id, { onDelete: 'set null' }),
+    /**
+     * Listed by the platform team from the brand's own public offers page, not by the shop (owner
+     * decision 2026-10-14). Shown as "Listed by <app name>", never as verified; offers run 7 days max.
+     */
+    listedByPlatform: boolean('listed_by_platform').notNull().default(false),
+    /** Where a platform listing's details come from (the brand's public offers page). */
+    sourceUrl: varchar('source_url', { length: 300 }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

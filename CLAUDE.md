@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-13.**
+> **Last updated: 2026-10-14.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -62,9 +62,10 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
+| Listings | **Platform listings**: chain outlets listed by an admin from the brand's public page, labelled "Listed by", never verified, offers 7 days max (ADR-0019) | ✅ Done 2026-10-14 (draft PR, owner to review) |
 | 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 194 unit + 166 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 195 unit + 170 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **14 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -122,7 +123,7 @@ apps/api/                 Backend: NestJS 12, TypeScript 6, Drizzle ORM, Postgre
                           analytics: nightly totals + 180-day clean-up, weekly business summary;
                           maintenance: nightly retention clean-up of personal data)
   src/cli/                migrate, seed, grant-role, add-localities, reset-mfa (emergency), export-openapi
-  database/migrations/    SQL migrations (0000–0012); some PostGIS/search SQL is hand-written
+  database/migrations/    SQL migrations (0000–0013); some PostGIS/search SQL is hand-written
   test/                   Integration tests (e2e-spec) + helpers (per-file database cloned from a template)
 apps/web/                 Website: Next.js 16 (App Router), React 19, Tailwind CSS 4
   src/app/                Routes (see §7)
@@ -256,6 +257,14 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 - These requirements are an admin setting (`business.verification`).
 - `CLOSED` (Phase 8) is final: the owner deleted their account. The shop is hidden, its offers ended, the owner photo deleted; nobody can edit, suspend or reactivate it.
 - Name, phone, registration number and location **lock** while the business is under review or verified; only admins can change them then.
+- **Platform listings** (ADR-0019, owner decision 2026-10-14):
+  - an admin lists a chain outlet (McDonald's, Domino's…) from the brand's public offers page at **Admin → Listed shops** (`POST /admin/businesses/listings`, with `sourceUrl`);
+  - it is public at once, with no photo verification;
+  - the listing admin becomes its owner and adds offers in the business portal, and **another admin** approves them;
+  - customers see "Listed by <app name> from the brand's public information" with a link to the brand's page, **never "✓ Verified"**;
+  - its offers run **7 days at most** (re-check the brand page weekly);
+  - type the facts in your own words: **no brand logos, photos or artwork**, and never store outlet details from Google Places (its terms forbid it);
+  - to take one down (for example, the brand objects), suspend the business.
 
 **Offer lifecycle** ([docs/offer-workflow.md](docs/offer-workflow.md), [docs/moderation.md](docs/moderation.md)):
 - Seven types: PRICE_DROP, PERCENTAGE_OFF, FLAT_AMOUNT_OFF, BUY_X_GET_Y, FREE_GIFT, COMBO, OTHER.
@@ -331,7 +340,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 | Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe`; legal (draft): `/privacy`, `/terms`, `/contact` (footer links) |
 | Account | `/login` (with the 2-step code step), `/account` (2-step login at `#two-step`, notification settings at `#notifications`) |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
-| Admin | `/admin` (review queues), `/admin/insights`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
+| Admin | `/admin` (review queues), `/admin/insights`, `/admin/listings`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
 Images:
 - **Public images** load directly from the API.
@@ -420,6 +429,8 @@ Still open:
   - reports keep the reporter's note after account deletion;
   - backups on the same disk, no alarms.
 - **Rotating `OTP_HASH_SECRET`** makes every stored authenticator secret unreadable: run `admin:reset-mfa` for each admin afterwards (ADR-0018).
+- **Platform listings are owned by the admin who listed them.** If that admin deletes their account, the listings close with it. There is no "claim" flow yet for a real outlet to take its listing over (do it by hand: new owner registers, the listing is suspended). Editing `sourceUrl` exists in the API (`PATCH /admin/businesses/:id`) but not on the website yet.
+- **Platform listings carry legal risk** (brands' trademarks and terms). It is reduced, not removed, by the label, the link, no logos and the 7-day limit. Include them in the lawyer's review of the legal pages.
 - **Domain events are in-process.** An event lost in a crash between commit and handler is not retried (ADR-0016); fine for the MVP, revisit if notifications become critical.
 
 ---
@@ -482,7 +493,7 @@ Still open:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0018).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0019).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -713,6 +724,34 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-14 · PR #21 · Platform listings: chain outlets listed from the brand's public page · Claude (AI agent), owner chose "Build it" 2026-10-14
+- **What changed:**
+  - **ADR-0019.** The owner wanted chain outlets' public offers on the site without contacting the outlets. Scraping Google Maps or the brands' apps was ruled out (their terms, Google's no-storage rule, trademarks). Instead, an admin types the outlet and its offers in by hand.
+  - **API:**
+    - migration 0013 adds `businesses.listed_by_platform` and `source_url`;
+    - `POST /admin/businesses/listings` (`businesses:manage`) creates the shop already verified and owned by the admin, with audit action `BUSINESS_LISTED`;
+    - `GET /admin/businesses?listed=true|false`;
+    - `PATCH /admin/businesses/:id` accepts `sourceUrl` for listings only;
+    - public business and offer views add `listedByPlatform` and `sourceUrl`; listings answer `isVerified: false`;
+    - offers of listings run 7 days at most (`LISTED_OFFER_MAX_DAYS`).
+  - **Website:**
+    - new **Admin → Listed shops** page (list + "List a shop" form with the brand's page and content rules);
+    - shop and offer pages show a "Listed by <app name> from the brand's public information" notice with a link to the brand's page; offer cards say "· from brand's website";
+    - the admin shop page explains the listing;
+    - activity sentence "listed … from the brand's public page";
+    - the draft terms and the footer now say some shops are listed by us.
+- **Why:** owner request 2026-10-14 to show McDonald's, Domino's, KFC and similar offers so the site looks full at launch.
+- **How it was verified:**
+  - API 195 unit tests (1 new: the 7-day limit) and **170 integration tests** (4 new in `test/listings.e2e-spec.ts`: permissions and URL validation; public at once but not verified; audit and list filter; 7-day limit; second admin approves; public offer shows the listing; source edits; owners can't set it);
+  - web lint, types, 30 unit tests;
+  - **14 browser tests** (1 new: an admin lists an outlet, a visitor sees the notice and the brand link and no "Verified") run locally against the built API, worker and website;
+  - listed shop page checked at 375 px.
+- **Deploy / migration / env notes:** migration 0013 runs on deploy and is backward compatible (new columns with defaults). No new environment variables. The website needs the new API fields, so **deploy the API first** (§6) or merge and let CI deploy it.
+- **Follow-ups:**
+  - a "claim this listing" flow for real outlets;
+  - editing the source page on the website;
+  - a lawyer's review of listings together with the legal pages.
 
 ### 2026-10-13 · PR #20 · Phase 9 (part 4): load test of search and login, search twice as fast · Claude (AI agent)
 - **What changed:**

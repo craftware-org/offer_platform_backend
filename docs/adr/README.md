@@ -22,5 +22,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0016](0016-notifications-domain-events-and-email-outbox.md) | Notifications via in-process domain events and an email outbox | Accepted |
 | [0017](0017-analytics-counting-rollups-and-charts.md) | Analytics: anonymous counting, daily rollups, read-only reporting module, hand-drawn charts | Accepted |
 | [0018](0018-admin-two-step-login-with-authenticator-app.md) | 2-step login for admins with an authenticator app (TOTP) | Accepted |
+| [0019](0019-platform-listings-from-brand-pages.md) | Platform listings: shops listed by an admin from the brand's public page | Accepted |
 
 Template: [`template.md`](template.md)

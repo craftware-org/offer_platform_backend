@@ -49,6 +49,7 @@ const TEMPLATES: Record<string, string> = {
   BUSINESS_REACTIVATED: 'reactivated {item}',
   BUSINESS_CLOSED: 'closed {item} (deleted their account)',
   BUSINESS_UPDATED_BY_ADMIN: 'edited {item}',
+  BUSINESS_LISTED: 'listed {item} from the brand\'s public page',
   CATEGORY_CREATED: 'added {item}',
   CATEGORY_CHANGED: 'changed {item}',
   CATEGORIES_REORDERED: 'reordered the categories',

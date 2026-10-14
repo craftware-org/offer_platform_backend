@@ -12,7 +12,7 @@ import { AccessControlService } from '../access-control/access-control.service.j
 import { AuditAction, AuditService } from '../audit/audit.service.js';
 import { CategoriesService } from '../categories/categories.service.js';
 import { LocationsService } from '../locations/locations.service.js';
-import type { CreateBusinessInput, UpdateBusinessInput } from './business.dto.js';
+import type { CreateBusinessInput, CreateListingInput, UpdateBusinessInput } from './business.dto.js';
 import { BusinessReader } from './business-reader.js';
 import { isFrozen, isLockedForOwner, LOCKED_FIELDS, nextBusinessStatus } from './business-status.machine.js';
 import {
@@ -62,57 +62,106 @@ export class BusinessesService {
           throw AppError.conflict(`You can register up to ${MAX_BUSINESSES_PER_OWNER} businesses`);
         }
 
-        await this.categories.assertAssignable(input.categoryId, tx);
-        const point = { latitude: input.location.latitude, longitude: input.location.longitude };
-        const { city } = await this.locations.resolveAddress(
-          { cityId: input.location.cityId, localityId: input.location.localityId, point },
-          tx,
-        );
-
-        const [created] = await tx
-          .insert(businesses)
-          .values({
-            ownerUserId: actor.userId,
-            name: input.name,
-            slug: await this.uniqueSlug(input.name, city.slug, tx),
-            description: input.description ?? null,
-            categoryId: input.categoryId,
-            ...this.contactFields(input),
-            socialLinks: input.socialLinks ?? {},
-            registrationNumber: input.registrationNumber ?? null,
-          })
-          .returning({ id: businesses.id });
-        if (!created) throw new Error('Insert returned no row');
-
-        await tx.insert(businessLocations).values({
-          businessId: created.id,
-          addressLine1: input.location.addressLine1,
-          addressLine2: input.location.addressLine2 ?? null,
-          localityId: input.location.localityId ?? null,
-          cityId: input.location.cityId,
-          postalCode: input.location.postalCode ?? null,
-          location: point,
-          openingHours: input.openingHours ?? null,
-        });
-        await tx
-          .insert(businessStaff)
-          .values({ businessId: created.id, userId: actor.userId, role: 'OWNER' });
-        await this.accessControl.grantRole(actor.userId, Role.BUSINESS_OWNER, null, tx);
+        const id = await this.insertBusiness(input, actor.userId, {}, tx);
         await this.audit.record(
           {
             actorUserId: actor.userId,
             action: AuditAction.BUSINESS_REGISTERED,
             entityType: 'business',
-            entityId: created.id,
+            entityId: id,
             newValue: { name: input.name, categoryId: input.categoryId, cityId: input.location.cityId },
             requestId: actor.requestId,
           },
           tx,
         );
-        return created.id;
+        return id;
       }),
     );
     return this.getManaged(actor.userId, id);
+  }
+
+  /**
+   * An admin lists a shop from the brand's public offers page (owner decision 2026-10-14). It is
+   * public at once, without the photo verification, and shown as "Listed by <app name>", never as
+   * verified. The admin becomes its owner so offers go through the normal portal and review.
+   * Returns the new business id.
+   */
+  async createListing(input: CreateListingInput, actor: Actor): Promise<string> {
+    return this.withSlugRetry(() =>
+      this.db.transaction(async (tx) => {
+        const now = new Date();
+        const id = await this.insertBusiness(
+          input,
+          actor.userId,
+          {
+            status: 'VERIFIED',
+            submittedAt: now,
+            verifiedAt: now,
+            verifiedBy: actor.userId,
+            listedByPlatform: true,
+            sourceUrl: input.sourceUrl,
+          },
+          tx,
+        );
+        await this.audit.record(
+          {
+            actorUserId: actor.userId,
+            action: AuditAction.BUSINESS_LISTED,
+            entityType: 'business',
+            entityId: id,
+            newValue: { name: input.name, sourceUrl: input.sourceUrl, cityId: input.location.cityId },
+            requestId: actor.requestId,
+          },
+          tx,
+        );
+        return id;
+      }),
+    );
+  }
+
+  /** Inserts the business, its primary location and its owner. */
+  private async insertBusiness(
+    input: CreateBusinessInput,
+    ownerUserId: string,
+    extra: Partial<typeof businesses.$inferInsert>,
+    tx: Executor,
+  ): Promise<string> {
+    await this.categories.assertAssignable(input.categoryId, tx);
+    const point = { latitude: input.location.latitude, longitude: input.location.longitude };
+    const { city } = await this.locations.resolveAddress(
+      { cityId: input.location.cityId, localityId: input.location.localityId, point },
+      tx,
+    );
+
+    const [created] = await tx
+      .insert(businesses)
+      .values({
+        ownerUserId,
+        name: input.name,
+        slug: await this.uniqueSlug(input.name, city.slug, tx),
+        description: input.description ?? null,
+        categoryId: input.categoryId,
+        ...this.contactFields(input),
+        socialLinks: input.socialLinks ?? {},
+        registrationNumber: input.registrationNumber ?? null,
+        ...extra,
+      })
+      .returning({ id: businesses.id });
+    if (!created) throw new Error('Insert returned no row');
+
+    await tx.insert(businessLocations).values({
+      businessId: created.id,
+      addressLine1: input.location.addressLine1,
+      addressLine2: input.location.addressLine2 ?? null,
+      localityId: input.location.localityId ?? null,
+      cityId: input.location.cityId,
+      postalCode: input.location.postalCode ?? null,
+      location: point,
+      openingHours: input.openingHours ?? null,
+    });
+    await tx.insert(businessStaff).values({ businessId: created.id, userId: ownerUserId, role: 'OWNER' });
+    await this.accessControl.grantRole(ownerUserId, Role.BUSINESS_OWNER, null, tx);
+    return created.id;
   }
 
   async listManaged(userId: string): Promise<OwnerBusinessView[]> {
@@ -204,10 +253,11 @@ export class BusinessesService {
         status: view.status,
         statusReason: view.statusReason,
         isVerified: view.isVerified,
+        listedByPlatform: view.listedByPlatform,
         submittedAt: view.submittedAt,
         verifiedAt: view.verifiedAt,
         /** Public page path once verified; null while not publicly visible. */
-        publicPath: view.isVerified ? `/businesses/${view.slug}` : null,
+        publicPath: view.status === 'VERIFIED' ? `/businesses/${view.slug}` : null,
       },
       verification: view.verification,
       canSubmit: (view.status === 'PENDING' || view.status === 'REJECTED') && view.verification.complete,

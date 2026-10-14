@@ -33,12 +33,15 @@ function fromHours(h: Hours): OpeningHours {
 /**
  * Register a business (no `business`) or edit one. Fields the API has locked for the owner
  * (`lockedFields`, e.g. while under review) are shown read-only and never sent.
+ * `listing`: an admin lists a shop from the brand's public offers page (platform listing).
  */
 export function BusinessForm({
   business,
+  listing = false,
   onSaved,
 }: {
   business?: OwnerBusiness;
+  listing?: boolean;
   onSaved: (b: OwnerBusiness) => void;
 }) {
   const locked = new Set(business?.lockedFields ?? []);
@@ -60,6 +63,7 @@ export function BusinessForm({
     postalCode: business?.address.postalCode ?? '',
     latitude: business ? String(business.coordinates.latitude) : '',
     longitude: business ? String(business.coordinates.longitude) : '',
+    sourceUrl: '',
   });
   const [withHours, setWithHours] = useState(!!business?.openingHours);
   const [hours, setHours] = useState<Hours>(toHours(business?.openingHours));
@@ -137,12 +141,13 @@ export function BusinessForm({
         longitude: lng,
       },
     };
+    if (listing) body.sourceUrl = v.sourceUrl.trim();
     for (const field of locked) delete body[field];
     if (!business) for (const [k, val] of Object.entries(body)) if (val === null) delete body[k];
     try {
       const saved = business
         ? await api<OwnerBusiness>(`/me/businesses/${business.id}`, { method: 'PATCH', body })
-        : await api<OwnerBusiness>('/me/businesses', { method: 'POST', body });
+        : await api<OwnerBusiness>(listing ? '/admin/businesses/listings' : '/me/businesses', { method: 'POST', body });
       onSaved(saved);
     } catch (e) {
       setError(errorMessage(e));
@@ -162,6 +167,27 @@ export function BusinessForm({
         void submit();
       }}
     >
+      {listing && (
+        <div>
+          <label className="label" htmlFor="b-source">
+            Brand&apos;s public offers page
+          </label>
+          <input
+            id="b-source"
+            className="input"
+            type="url"
+            required
+            maxLength={300}
+            placeholder="https://…"
+            value={v.sourceUrl}
+            onChange={set('sourceUrl')}
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Customers are sent here to check the latest details. Type the facts in your own words; don&apos;t copy the
+            brand&apos;s logo, photos or artwork.
+          </p>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="b-name">
@@ -317,7 +343,7 @@ export function BusinessForm({
 
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button className="btn-primary" disabled={busy}>
-        {busy ? 'Saving…' : business ? 'Save changes' : 'Register business'}
+        {busy ? 'Saving…' : business ? 'Save changes' : listing ? 'List this shop' : 'Register business'}
       </button>
     </form>
   );

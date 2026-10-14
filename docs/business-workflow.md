@@ -44,6 +44,17 @@ Registering a business grants the user the `BUSINESS_OWNER` role. One user can o
 
 Every step is recorded in the audit log (`GET /admin/audit-logs?entityId=<businessId>`).
 
+## Platform listings (ADR-0019)
+
+An admin can list a chain outlet from the brand's public offers page without the shop taking part (owner decision 2026-10-14):
+
+- **Website:** Admin → **Listed shops** → "List a shop" (same form as registration, plus the brand's page). **API:** `POST /admin/businesses/listings` (`businesses:manage`).
+- The shop is `VERIFIED` (public) at once, with no photo verification. The listing admin becomes its owner and adds offers in the business portal. Another admin approves them.
+- Customers see "Listed by <app name> from the brand's public information" with a link to the brand's page, never "✓ Verified". Public views return `listedByPlatform: true`, `sourceUrl`, `isVerified: false`.
+- Its offers run **7 days at most**: re-check the brand's page and list them again.
+- Type the facts in your own words. No brand logos, photos or artwork. Never store outlet details from Google Places.
+- To take a listing down (for example, a brand objects): suspend the business.
+
 ## Editing rules
 
 | Field | PENDING / REJECTED | UNDER_REVIEW / VERIFIED | SUSPENDED |

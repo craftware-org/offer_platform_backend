@@ -9,7 +9,7 @@
 > - This file is the *reference*: what the product is and how it is built.
 > - Deeper technical detail: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/](docs/), [docs/adr/](docs/adr/README.md).
 >
-> **Last updated:** 2026-10-09. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
+> **Last updated:** 2026-10-14. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
 
 ---
 
@@ -90,6 +90,7 @@ The goal is **liquidity and engagement of the local marketplace**, not revenue.
 
 | Date | Decision |
 |---|---|
+| 2026-10-14 | **Platform listings** (ADR-0019). Chain outlets such as McDonald's, Domino's and KFC are added by an admin from the brand's public offers page, without the outlet taking part. Copying from Google Maps or scraping the brands' apps was ruled out. Listings are labelled "Listed by <app name>" with a link to the brand's page, never "verified". They show no brand logos or artwork, and their offers run 7 days at most. |
 | 2026-10-09 | **Phase 9 (production readiness) approved.**<br>• Name **Dodoom**; the domain is decided later (dodoom.com is taken by someone else).<br>• **MSG91** for SMS; DLT registration by Craftware.<br>• **Managed database:** RDS PostgreSQL + S3, with API, worker and Valkey on EC2.<br>• Work that needs no decision comes first: automatic deploys, monitoring, browser tests, off-server backups, draft legal pages. |
 | 2026-10-09 | **Phase 8 (security audit) approved and built.**<br>• **Admins use 2-step login with an authenticator app.**<br>• Server secrets are rotated **at launch only**.<br>• **Longer retention:** login codes 90 days, ended sessions 90 days, notifications 1 year, activity log 7 years.<br>• When an owner deletes their account, **their shops are closed**.<br>• Six low-risk findings are **accepted until Phase 9**: login token in browser storage, inline styles, API docs on the preview, phone codes in the preview log, report notes kept, backups on the same disk. |
 | 2026-10-08 | **Phase 7 (analytics) approved** (built 2026-10-09). Page views and taps are counted **for everyone**, logged in or not (this replaces the logged-in-only rule for taps), without storing who they are. **Searches are recorded** (words, city, result count; no user). **Raw events are kept 180 days**, daily totals forever. Businesses get a **weekly summary** on Mondays. |
@@ -313,6 +314,11 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
   - max 8 MB, JPEG/PNG/WebP/AVIF;
   - re-encoded to WebP and metadata stripped.
 - **Visibility:** public pages show **verified** businesses only.
+- **Platform listings** (ADR-0019):
+  - an admin lists a chain outlet from the brand's public page (`POST /admin/businesses/listings`, with `sourceUrl`);
+  - it is public at once and owned by that admin;
+  - customers see it as "listed", with `isVerified: false`;
+  - its offers run 7 days at most.
 
 ### `offers`
 - **Seven types:**
@@ -491,6 +497,7 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 2. They upload a **shop photo** (and optionally an owner photo and a registration number), then **submit**. The business becomes **UNDER_REVIEW** and key fields lock.
 3. An admin reviews the details and private photos, then **verifies** it, or **rejects** it with a reason the owner sees.
 4. Once **VERIFIED**, the business appears publicly and can publish offers.
+5. **Platform listings** skip steps 1–3. An admin lists a chain outlet from its brand page, and it is public at once, labelled as listed and never as verified (ADR-0019).
 
 ### Offer lifecycle
 1. The business creates a **DRAFT** (one of 7 types, dates, terms, photos). The server calculates the discount.

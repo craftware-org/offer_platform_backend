@@ -6,7 +6,7 @@ import { escapeLike } from '../../common/text/like.js';
 import { offsetOf, Page, type PageQuery } from '../../common/http/pagination.js';
 import { DB, type Database } from '../../infrastructure/database/database.module.js';
 import { AuditAction, AuditService } from '../audit/audit.service.js';
-import type { UpdateBusinessInput } from './business.dto.js';
+import type { AdminUpdateBusinessInput } from './business.dto.js';
 import { BusinessReader } from './business-reader.js';
 import { nextBusinessStatus } from './business-status.machine.js';
 import { toAdminView, type AdminBusinessView } from './business-views.js';
@@ -20,6 +20,8 @@ export interface AdminBusinessQuery extends PageQuery {
   search?: string;
   cityId?: string;
   categoryId?: string;
+  /** true: only platform listings; false: only shops registered by their owners. */
+  listed?: boolean;
 }
 
 interface Actor {
@@ -50,6 +52,7 @@ export class BusinessModerationService {
     if (query.status) filters.push(eq(businesses.status, query.status));
     if (query.cityId) filters.push(eq(businessLocations.cityId, query.cityId));
     if (query.categoryId) filters.push(eq(businesses.categoryId, query.categoryId));
+    if (query.listed !== undefined) filters.push(eq(businesses.listedByPlatform, query.listed));
     if (query.search) {
       const term = `%${escapeLike(query.search)}%`;
       const match = or(
@@ -135,12 +138,21 @@ export class BusinessModerationService {
       );
     });
     // Announced after commit (ADR-0016).
-    await this.events.emit('business.status_changed', { businessId, action, status: newStatus, reason: reason ?? null });
+    await this.events.emit('business.status_changed', {
+      businessId,
+      action,
+      status: newStatus,
+      reason: reason ?? null,
+    });
     return this.get(businessId);
   }
 
   /** Admins may change any field, including those locked for the owner. Always audited. */
-  async update(businessId: string, patch: UpdateBusinessInput, actor: Actor): Promise<AdminBusinessView> {
+  async update(
+    businessId: string,
+    patch: AdminUpdateBusinessInput,
+    actor: Actor,
+  ): Promise<AdminBusinessView> {
     await this.db.transaction(async (tx) => {
       const [business] = await tx
         .select()
@@ -162,7 +174,14 @@ export class BusinessModerationService {
         },
       };
 
-      await this.businessesService.applyUpdate(business, patch, tx);
+      const { sourceUrl, ...fields } = patch;
+      if (sourceUrl !== undefined) {
+        if (!business.listedByPlatform) {
+          throw AppError.validation({ sourceUrl: 'Only a platform listing has a source page' });
+        }
+        await tx.update(businesses).set({ sourceUrl }).where(eq(businesses.id, businessId));
+      }
+      await this.businessesService.applyUpdate(business, fields, tx);
       await this.audit.record(
         {
           actorUserId: actor.userId,

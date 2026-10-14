@@ -36,6 +36,7 @@ export function OfferCard({ offer }: { offer: PublicOffer | DiscoveredOffer }) {
         <p className="text-sm text-gray-600">
           {offer.business.name}
           {offer.business.isVerified && <span className="ml-1 text-green-700">✓</span>}
+          {offer.business.listedByPlatform && <span className="ml-1 text-xs text-gray-500">· from brand&apos;s website</span>}
         </p>
         <OfferPrice type={offer.type} pricing={offer.pricing} />
         <div className="mt-auto flex justify-between pt-2 text-xs text-gray-500">

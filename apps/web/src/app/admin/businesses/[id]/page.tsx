@@ -35,7 +35,7 @@ function actionsFor(b: AdminBusiness, can: (p: string) => boolean): ModerationAc
 
 function Review() {
   const { id } = useParams<{ id: string }>();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const [b, setB] = useState<AdminBusiness | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +73,26 @@ function Review() {
         <StatusBadge status={b.status} />
       </div>
       {b.statusReason && <p className="text-sm text-gray-700">Last reason: {b.statusReason}</p>}
+      {b.listedByPlatform && (
+        <p className="rounded-lg bg-sky-50 p-3 text-sm text-sky-900">
+          Listed by an admin from{' '}
+          {b.sourceUrl ? (
+            <a className="underline" href={b.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+              the brand&apos;s public page
+            </a>
+          ) : (
+            "the brand's public page"
+          )}
+          , without photo verification. Customers see it as listed, not verified.{' '}
+          {user?.id === b.ownerUserId ? (
+            <Link className="underline" href={`/business/${b.id}`}>
+              Manage its offers
+            </Link>
+          ) : (
+            'Its offers are managed by the admin who listed it.'
+          )}
+        </p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <section className="card space-y-2 text-sm">
