@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-11.**
+> **Last updated: 2026-10-14.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -62,10 +62,10 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
-| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests, off-server backups, legal pages, then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
+| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 | Mobile | **Android app** (`apps/mobile`, Expo SDK 57): customer screens, login, saved/following, inbox, full business portal; Google Play guide in [docs/mobile.md](docs/mobile.md) (ADR-0019, proposed) | 🟡 Built 2026-10-11 on a team member's request; **awaiting owner approval**, not released |
 
-**Tests (all must stay green):** API 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **mobile 27 unit tests** plus a full Android Metro bundle check; **11 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 194 unit + 166 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **mobile 27 unit tests** plus a full Android Metro bundle check; **13 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -73,7 +73,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test
 
 ---
 
@@ -163,7 +163,7 @@ pnpm --filter @offer-platform/api start:dev           # API on http://localhost:
 pnpm --filter @offer-platform/api start:worker:dev    # background worker (second terminal)
 
 cp apps/web/.env.example apps/web/.env.local          # NEXT_PUBLIC_API_URL=http://localhost:3000
-pnpm --filter @offer-platform/web dev -- --port 3001  # website on http://localhost:3001
+pnpm --filter @offer-platform/web dev --port 3001     # website on http://localhost:3001 (no "--" with pnpm 12)
 ```
 
 - Add `http://localhost:3001` to `CORS_ORIGINS` in `apps/api/.env`. Values already set in the environment override the file.
@@ -337,7 +337,7 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 
 | Area | Routes |
 |---|---|
-| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe` |
+| Customer | `/`, `/search`, `/offers/[slug]` and `/businesses/[slug]` (server-rendered, OpenGraph tags), `/saved`, `/following`, `/notifications`, `/unsubscribe`; legal (draft): `/privacy`, `/terms`, `/contact` (footer links) |
 | Account | `/login` (with the 2-step code step), `/account` (2-step login at `#two-step`, notification settings at `#notifications`) |
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
 | Admin | `/admin` (review queues), `/admin/insights`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
@@ -401,7 +401,8 @@ Still open:
 6. **Android app (built 2026-10-11, ADR-0019 proposed):** approve it; confirm the permanent package id `com.craftware.offerplatform`; create the Google Play developer account (organisation account needs a D-U-N-S number; personal accounts must run a 12-tester, 14-day closed test first); review the draft `/privacy` and `/terms` pages. Full list: [docs/mobile.md](docs/mobile.md#before-a-public-release).
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI. Next: off-server backups to S3 (needs the owner's OK for AWS changes), draft legal pages; then RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: RDS + S3 images, MSG91, the domain, switch-over.
+- **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
@@ -477,6 +478,7 @@ Still open:
 - Nest: a `@Post` that returns data answers 201 unless it has `@HttpCode(HttpStatus.OK)`.
 - Drizzle `sql` templates expand a JS array into a parameter list: write `id IN ${ids}` (guard empty arrays), not `= ANY(${ids}::uuid[])`.
 - Stopping a background `next dev` task on Windows can leave Next's server process running on port 3001 in a broken state (blank pages, "Jest worker" errors). Find it with `netstat -ano | grep :3001` and stop that process.
+- pnpm 12 passes `--` through to the script: run `pnpm --filter @offer-platform/web dev --port 3001`, not `dev -- --port 3001` (Next then reads `--port` as a folder).
 - Playwright: after `page.goto`, wait for `networkidle` before typing into a form. Otherwise React finishes loading, resets the inputs, and the form says "Please fill out this field".
 - Browser tests share one IP address across every simulated person: raise `RATE_LIMIT_PER_IP_PER_MINUTE` for the test API, or runs fail with "Too many requests".
 - Analytics days before yesterday come from `analytics_daily`. On a fresh local database, start the **worker** once (it rolls up at start-up) or the dashboards show zeros for older days.
@@ -494,6 +496,7 @@ Still open:
 ## 12. Document index
 
 - [docs/security-audit-2026-10-09.md](docs/security-audit-2026-10-09.md): Phase 8 audit, every finding and its status.
+- [docs/load-test.md](docs/load-test.md): load test of search and login (method, results, how to re-run).
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
@@ -682,7 +685,7 @@ Still open:
 > - **managed database**: RDS + S3, API/worker/Valkey on EC2;
 > - decision-free work first.
 >
-> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17).
+> **Done:** automatic API deploys and monitoring (PR #16); browser tests in CI (PR #17); draft legal pages (PR #19); load test (PR #20).
 
 **Dependencies** (owner decisions):
 - final name and domain;
@@ -701,8 +704,8 @@ Still open:
 | Secret rotation | Rotate the database password, `JWT_ACCESS_SECRET`, `OTP_HASH_SECRET` and the Gmail App Password (owner decision: at launch). After `OTP_HASH_SECRET`, run `admin:reset-mfa` for every admin so they set up 2-step login again |
 | SMS | Real provider behind the existing `SmsProvider` interface; DLT templates; console SMS switched off |
 | Monitoring | Central logs, error tracking, uptime checks; alarms for API down, worker stuck, disk/database usage, error rate |
-| Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); a load test of search and login (to do) |
-| Legal pages | Privacy policy, terms of use, contact page (text from the owner) |
+| Quality | ✅ Playwright browser tests in CI for the main flows (PR #17); ✅ load test of search and login (PR #20, [docs/load-test.md](docs/load-test.md)): one preview-sized server handles about 45 searches and 20 logins a second |
+| Legal pages | ✅ Drafts at `/privacy`, `/terms`, `/contact` (PR #19), written from what the platform stores. To do: the owner's details (address, grievance officer, court city), a lawyer's review, then remove the draft notice |
 | Switch-over | `PREVIEW_MODE=false`, `NODE_ENV=production`, search-engine indexing on, preview data wiped, first admins created |
 
 **Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
@@ -730,6 +733,31 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Follow-ups:
 ```
 
+### 2026-10-13 · PR #20 · Phase 9 (part 4): load test of search and login, search twice as fast · Claude (AI agent)
+- **What changed:**
+  - **Load test** (`apps/api/test/load`, `pnpm --filter @offer-platform/api test:load`, autocannon 8.0.0 as a dev dependency): home sections, search with 20 real phrases, near me, offer page and password login, at 10 and 50 simultaneous users, each request from a random IP. `seed.sql` adds 300 shops / 3,000 live offers (refuses to run without the local e2e accounts); `cleanup.sql` removes them.
+  - **Search speed-up:** every search ran its text matching twice (page + count) and PostgreSQL hit 100 % CPU. The total now comes from the same query (`count(*) over ()`); a separate count runs only for a page past the last result. Search 24 → 45 requests a second (median 402 → 206 ms); near me 74 → 111.
+  - New integration test: the same total on every page, past the last page, and 0 when nothing matches.
+  - **Report:** [docs/load-test.md](docs/load-test.md).
+- **Why:** Phase 9 quality row (load test of search and login), approved with "Finish Phase 9" on 2026-10-13.
+- **How it was verified:** run against the production Docker image limited to t3.micro's 2 vCPUs / 1 GB (API and PostgreSQL 1 CPU + 512 MB each); 0 errors in the final run. API lint, types, 194 unit tests, discovery integration tests (14).
+- **Deploy / migration / env notes:** none. The search change is backward compatible (same response).
+- **Follow-ups (not needed for launch):** index-friendly text matching (pg_trgm operators), cache home sections in Valkey, re-run the test after the RDS move.
+
+### 2026-10-13 · PR #19 · Phase 9 (part 3): draft legal pages and log rotation · Claude (AI agent), owner chose "draft, marked as draft" 2026-10-10
+- **What changed:**
+  - **Website:** new `/privacy`, `/terms` and `/contact` pages (server-rendered), each with a visible "Draft, under review" notice; footer links on every page; the login code step says "By continuing you agree to our Terms of use and Privacy policy".
+  - **Privacy policy** written from what the platform really stores (§7): account, login security, shop details and private verification photos, saves/follows/reports, notifications, usage counts (views without the viewer, taps, searches without the searcher), location never stored, technical logs; service providers (AWS Mumbai, Vercel, Google email, SMS later); retention as in §7; rights (correct, delete account, stop emails, grievance officer, Data Protection Board).
+  - **Terms of use:** free service, 18+, rules for shops and for everyone, "verified" is a check not a guarantee, liability as far as the law allows, Indian law.
+  - **Owner's details** in one file, `apps/web/src/lib/legal.ts`; missing ones show "[… : to be provided]".
+  - **Server log rotation:** the API's request logs record visitors' IP addresses and were never deleted. Every container now rotates its Docker logs (json-file, 5 × 10 MB), so the privacy policy's "deleted automatically" is true.
+  - **Browser test:** the legal pages open from the footer and show the draft notice (desktop + phone): 13 browser tests.
+  - **Handbook fix:** the website dev command is `dev --port 3001` (pnpm 12 passes `--` through).
+- **Why:** Phase 9 legal-pages row; the owner chose drafts marked as drafts.
+- **How it was verified:** web lint, types, 30 unit tests; the new browser test on desktop and phone against a local API; pages checked in a browser at 375 px (no sideways scroll); compose file validated (`docker compose config`: all 6 services rotate).
+- **Deploy / migration / env notes:** no migration, no new environment variables. The log rotation applies when the containers are recreated by the next API deploy.
+- **Follow-ups:** the owner provides the registered address, grievance officer and court city, and confirms the 18+ rule; a lawyer reviews; then remove the draft notice.
+
 ### 2026-10-11 · PR #18 · Android app (`apps/mobile`) · Claude (AI agent), requested by a team member; needs the product owner's approval
 - **What changed:**
   - **New workspace package `@offer-platform/mobile`:** Expo SDK 57, React Native 0.86, Expo Router, TypeScript; ADR-0019 (proposed).
@@ -740,7 +768,7 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
   - **Android config:** package `com.craftware.offerplatform`; only location and camera permissions (background location, microphone and storage removed); App Links for `/offers/` and `/businesses/` on the website host; EAS profiles `development` / `preview` (APK) / `production` (AAB, auto version code) and Play submission to the internal track.
   - **docs/mobile.md:** layout, configuration, builds, Google Play step by step, data safety answers, release prerequisites.
   - **`.vercelignore`:** excludes `apps/mobile`.
-  - **Play Store prerequisites:** app icon, adaptive and monochrome icons and splash (an orange price tag, generated by `apps/mobile/store/make-icons.cjs`); Play listing texts and graphics in `apps/mobile/store/`; **draft `/privacy` and `/terms` pages** on the website (written from the code, linked in the footer and the app; owner to review the wording).
+  - **Play Store prerequisites:** app icon, adaptive and monochrome icons and splash (an orange price tag, generated by `apps/mobile/store/make-icons.cjs`); Play listing texts and graphics in `apps/mobile/store/`. The app's Account screen links to the website's `/privacy` and `/terms` (the PR #19 pages, which replaced this PR's own drafts in the merge with `main`; the privacy page now also names the Android app).
 - **Why:** a team member asked for an Android app (customers and business portal) for Google Play.
 - **How it was verified:**
   - `pnpm turbo run lint typecheck test build` is green for all apps (11 tasks).
@@ -759,7 +787,7 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
   - Owner approval (ADR-0019).
   - Expo account + `eas init`.
   - Google Play developer account.
-  - Owner review of the `/privacy` and `/terms` wording and the contact address.
+  - The legal pages' open items from PR #19 (address, grievance officer, lawyer review).
   - `assetlinks.json` on the website after Play App Signing.
   - Push notifications (FCM).
   - `packages/shared` for the copied helpers.

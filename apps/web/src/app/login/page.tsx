@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '@/lib/api';
@@ -246,6 +247,17 @@ function Login() {
           <button className="btn-primary w-full" disabled={busy || !identity.trim()}>
             {busy ? 'Sending…' : 'Send code'}
           </button>
+          <p className="text-xs text-gray-500">
+            By continuing you agree to our{' '}
+            <Link href="/terms" className="underline">
+              Terms of use
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="underline">
+              Privacy policy
+            </Link>
+            .
+          </p>
           <button type="button" className="text-sm text-gray-700 underline" onClick={() => switchMode('password')}>
             Back to password login
           </button>

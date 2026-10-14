@@ -73,7 +73,7 @@ pnpm --filter @offer-platform/api start:worker:dev
 
 ```bash
 cp apps/web/.env.example apps/web/.env.local     # NEXT_PUBLIC_API_URL=http://localhost:3000
-pnpm --filter @offer-platform/web dev -- --port 3001
+pnpm --filter @offer-platform/web dev --port 3001
 ```
 
 Add `http://localhost:3001` to `CORS_ORIGINS` in `apps/api/.env` so the browser may call the local API.

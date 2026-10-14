@@ -27,7 +27,8 @@
     "admin:grant-role": "nest build && node dist/cli/grant-role.js",
     "admin:add-localities": "nest build && node dist/cli/add-localities.js",
     "admin:reset-mfa": "nest build && node dist/cli/reset-mfa.js",
-    "openapi:export": "nest build && node dist/cli/export-openapi.js"
+    "openapi:export": "nest build && node dist/cli/export-openapi.js",
+    "test:load": "node test/load/run.mjs"
   },
   "dependencies": {
     "@nestjs/bullmq": "12.0.0",
@@ -65,6 +66,7 @@
     "@types/qrcode": "1.5.6",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.1.2",
+    "autocannon": "8.0.0",
     "drizzle-kit": "^0.31.11",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",

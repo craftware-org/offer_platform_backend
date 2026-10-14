@@ -1,68 +1,98 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { LegalPage, Placeholder, Section } from '@/components/legal-page';
+import { legal } from '@/lib/legal';
 import { getAppMeta } from '@/lib/server-api';
 
 export const metadata: Metadata = { title: 'Terms of use' };
 
-const CONTACT = 'craftwaretech@gmail.com';
-const UPDATED = '11 October 2026';
-
-/** Terms for the website and the Android app. DRAFT, to be reviewed by the product owner before launch. */
+/** DRAFT terms of use (Phase 9). A lawyer reviews them before launch. */
 export default async function TermsPage() {
   const { appName } = await getAppMeta();
   return (
-    <article className="card mx-auto max-w-3xl space-y-4 text-sm leading-6 text-gray-800">
-      <h1 className="text-2xl font-bold">Terms of use</h1>
-      <p className="text-gray-500">Last updated {UPDATED}</p>
+    <LegalPage title="Terms of use">
       <p>
-        {appName} is run by <strong>Craftware</strong>. By using the website or the app you agree to these terms. Our{' '}
-        <Link className="text-brand-700 underline" href="/privacy">
-          privacy policy
-        </Link>{' '}
-        explains how we handle your data.
+        These terms apply when you use {appName}, a service built and run by {legal.company}. By creating an account or
+        using the service you agree to them. Please also read our <Link href="/privacy" className="underline">privacy
+        policy</Link>.
       </p>
 
-      <h2 className="pt-2 text-lg font-semibold">What {appName} is</h2>
-      <p>
-        A free platform where local shops publish offers and customers find them. We do not sell products, take payments or
-        deliver anything. Any purchase is between you and the shop.
-      </p>
+      <Section title="1. The service">
+        <p>
+          {appName} lets local shops publish offers and lets people nearby find them. It is free for shops and customers.
+          If we ever introduce paid features, we will announce them in advance, and nothing will be charged without your
+          agreement.
+        </p>
+        <p>
+          We do not sell the products or services in the offers. Each offer is made by the shop that published it, and any
+          purchase is between you and that shop.
+        </p>
+      </Section>
 
-      <h2 className="pt-2 text-lg font-semibold">Offers</h2>
-      <ul className="list-disc space-y-1 pl-5">
-        <li>Each offer is written by the shop. We check shops and review every offer before it is shown, but the shop is responsible for honouring it.</li>
-        <li>Prices, stock and dates can change; confirm with the shop before you travel or buy.</li>
-        <li>If an offer is wrong or misleading, use “Report this offer”. We may hide offers or suspend shops.</li>
-      </ul>
+      <Section title="2. Your account">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>You must be 18 or older.</li>
+          <li>Give correct details, keep your password and login codes to yourself, and tell us if someone else uses your account.</li>
+          <li>You can delete your account at any time from the Account page.</li>
+        </ul>
+      </Section>
 
-      <h2 className="pt-2 text-lg font-semibold">Shops</h2>
-      <ul className="list-disc space-y-1 pl-5">
-        <li>Give true details and photos of a real business you are allowed to represent.</li>
-        <li>Publish only genuine offers you will honour, with clear terms. No illegal, offensive or misleading content.</li>
-        <li>You keep ownership of your photos and text and allow us to show them on {appName} to run the service.</li>
-      </ul>
+      <Section title="3. Rules for shops">
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Register only a shop you own or are allowed to represent, with true details and photos.</li>
+          <li>
+            Offers must be real and honest: correct prices, conditions and dates, and you must honour them while they are
+            live.
+          </li>
+          <li>
+            Every shop and every offer is reviewed by our team before it appears. &ldquo;Verified&rdquo; means we checked
+            the shop&rsquo;s details and photos; it is not a guarantee of the shop, its products or its offers.
+          </li>
+          <li>
+            You allow us to show your shop details, photos and offers on {appName} and in links shared from it, for as long
+            as they are published.
+          </li>
+          <li>
+            We may reject or change-request an offer, suspend an offer or a shop, or warn a shop, for example after reports
+            from customers.
+          </li>
+        </ul>
+      </Section>
 
-      <h2 className="pt-2 text-lg font-semibold">Your account</h2>
-      <ul className="list-disc space-y-1 pl-5">
-        <li>Keep your password and login codes private. You are responsible for activity on your account.</li>
-        <li>Do not misuse the service: no fake reports, scraping, spam or attempts to break security.</li>
-        <li>We may suspend accounts that break these terms. You can delete your account at any time.</li>
-      </ul>
+      <Section title="4. Rules for everyone">
+        <p>Do not:</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>post false, misleading, offensive or illegal content;</li>
+          <li>send false reports or misuse the report button;</li>
+          <li>use bots or scripts to copy content or to inflate views and taps;</li>
+          <li>try to break into accounts or our systems, or overload them.</li>
+        </ul>
+        <p>We may suspend accounts that break these rules.</p>
+      </Section>
 
-      <h2 className="pt-2 text-lg font-semibold">Liability</h2>
-      <p>
-        The service is provided free and “as is”. To the extent the law allows, Craftware is not liable for losses arising
-        from offers, shops or purchases made through {appName}.
-      </p>
+      <Section title="5. Our responsibility">
+        <p>
+          We work to keep {appName} accurate and available, but offers come from shops and can change, sell out or end
+          early, and the service may sometimes be unavailable. To the extent the law allows, {legal.company} is not
+          responsible for a shop&rsquo;s products, services or offers, or for losses arising from them. Nothing in these
+          terms limits rights you have under Indian consumer law.
+        </p>
+      </Section>
 
-      <h2 className="pt-2 text-lg font-semibold">Law and contact</h2>
-      <p>
-        These terms are governed by the laws of India; courts in Karnataka have jurisdiction. Questions:{' '}
-        <a className="text-brand-700 underline" href={`mailto:${CONTACT}`}>
-          {CONTACT}
-        </a>
-        .
-      </p>
-    </article>
+      <Section title="6. Changes and law">
+        <p>
+          We may update these terms; we will change the date on this page and tell you in advance of important changes.
+          These terms are governed by the laws of India. Disputes go to the courts of{' '}
+          {legal.jurisdiction ?? <Placeholder>City for court jurisdiction</Placeholder>}.
+        </p>
+      </Section>
+
+      <Section title="7. Contact">
+        <p>
+          Questions about these terms: <a className="underline" href={`mailto:${legal.contactEmail}`}>{legal.contactEmail}</a>.
+          See also the <Link href="/contact" className="underline">contact page</Link>.
+        </p>
+      </Section>
+    </LegalPage>
   );
 }
