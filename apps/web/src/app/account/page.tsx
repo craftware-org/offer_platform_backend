@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { AccountHub } from '@/components/account-hub';
 import { NotificationSettings } from '@/components/notification-settings';
 import { TwoStepSettings } from '@/components/two-step-settings';
 import { RequireAuth } from '@/components/require-auth';
@@ -80,6 +81,7 @@ function Account() {
 
   return (
     <div className="mx-auto max-w-md space-y-6">
+      <AccountHub />
       <form
         className="card space-y-4"
         onSubmit={(e) => {
@@ -87,7 +89,7 @@ function Account() {
           void save();
         }}
       >
-        <h1 className="text-xl font-semibold">Your account</h1>
+        <h2 className="section-title">Profile</h2>
         {user.phone && <p className="text-sm text-gray-600">Phone: {user.phone}</p>}
         <div>
           <label className="label" htmlFor="name">

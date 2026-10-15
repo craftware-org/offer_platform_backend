@@ -13,7 +13,7 @@ export function RangePicker({ value, onChange }: { value: RangeDays; onChange: (
           type="button"
           aria-pressed={value === d}
           onClick={() => onChange(d)}
-          className={`px-3 py-1.5 ${value === d ? 'bg-brand-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+          className={`px-3 py-1.5 ${value === d ? 'bg-brand-600 text-on-brand' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
         >
           {d} days
         </button>

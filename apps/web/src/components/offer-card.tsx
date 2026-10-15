@@ -23,7 +23,7 @@ export function OfferCard({ offer }: { offer: PublicOffer | DiscoveredOffer }) {
           </div>
         )}
         {offer.headline && (
-          <span className="badge absolute top-2 left-2 bg-brand-600 text-white">{offer.headline}</span>
+          <span className="badge absolute top-2 left-2 bg-brand-600 text-on-brand">{offer.headline}</span>
         )}
         {offer.availability !== 'EXPIRED' && (
           <span className="absolute top-2 right-2">

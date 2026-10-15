@@ -9,7 +9,7 @@
 > - This file is the *reference*: what the product is and how it is built.
 > - Deeper technical detail: [ARCHITECTURE.md](ARCHITECTURE.md), [docs/](docs/), [docs/adr/](docs/adr/README.md).
 >
-> **Last updated:** 2026-10-14. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
+> **Last updated:** 2026-10-15. Update this file whenever a fact in it changes (see [CLAUDE.md](CLAUDE.md) §0).
 
 ---
 
@@ -155,7 +155,7 @@ Everything else in the specification (statuses, server-side discount calculation
 | SMS | Console provider only | **Vendor pending** |
 | Logging | **pino** (nestjs-pino) | Coordinates, phone numbers and auth headers are masked |
 | Security headers | **helmet**; website: nonce-based CSP | |
-| Website | **Next.js 16**, **React 19**, **Tailwind CSS 4** | Server-rendered public pages; logged-in screens in the browser |
+| Website | **Next.js 16**, **React 19**, **Tailwind CSS 4**, **lucide-react** icons, Plus Jakarta Sans (self-hosted) | Server-rendered public pages; logged-in screens in the browser; own design system with dark mode (ADR-0023) |
 | Tests | **Vitest 4**, **Testcontainers** (real PostGIS + Valkey), supertest | Each integration test file gets its own database |
 | Lint | **oxlint** | |
 | CI | **GitHub Actions** (Ubuntu 24.04) | Lint, types, unit + integration tests, builds, OpenAPI export |
@@ -451,6 +451,8 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
   - a per-request content security policy (nonce) blocks injected scripts;
   - private images are fetched with the token.
 - **Brand name:** read from the API (`/meta`).
+- **Navigation (UI redesign, ADR-0023):** on phones a bottom tab bar (Home · Search · Saved · Alerts · Account) and an Account page that leads to following, the business portal, admin and appearance; on desktop one top bar with a search box, Saved, 🔔 and an account menu.
+- **Look:** a small design system in `globals.css` (brand orange, warm grays, shared button/input/card/badge/chip classes) and **dark mode** (Light / Dark / Device, remembered per browser, applied before the first paint).
 
 ---
 
@@ -576,6 +578,7 @@ Each module lives in `apps/api/src/modules/<name>/` and has a schema (its tables
 | 7 | **Analytics:** views and taps from everyone, search logging, daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 | — |
 | 8 | **Security audit:** ASVS L2 review ([report](docs/security-audit-2026-10-09.md)), admin 2-step login, every-route permission test, complete account deletion, retention clean-up, dependency fixes, backup restore drill | ✅ Done 2026-10-09 (secrets rotate at launch) | — |
 | 9 | **Production readiness (in progress; automatic deploys, monitoring, browser tests, draft legal pages at /privacy, /terms, /contact and a load test (about 45 searches and 20 logins a second on a t3.micro-sized setup, docs/load-test.md) done):** RDS / ElastiCache / S3, a bigger or managed server, CI deploys with approval, monitoring and alarms, real domain + domain email, real SMS, httpOnly-cookie login, browser tests, legal pages, switch-over | ⏳ | **Final name + domain, SMS vendor + DLT, maps vendor, AWS budget, launch date** |
+| UI | **Website redesign** in 5 PRs: design system + dark mode + navigation (✅ PR 1, 2026-10-15), then home/search/cards, offer and shop pages, business portal + admin, forms and polish | 🚧 Approved 2026-10-15 | — |
 | Later | Mobile apps (with push notifications); phone + email on one account; map address search; Kannada interface | Not scheduled | Owner priorities |
 | V2–V7 (spec) | QR redemption, reviews, branches → rewards, referrals, personalized feed → paid campaigns, sponsored listings, premium analytics → customer membership → AI recommendations and offer generation → possible e-commerce | Not before explicitly requested | Feature flags already exist (all `false`) |
 
@@ -664,8 +667,8 @@ Legend:
 ## 13. Quality: testing and definition of done
 
 **Tests today:**
-- API: 194 unit + 165 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
-- Website: 30 unit tests, and 11 browser tests (Playwright, desktop and phone) of the MVP path, run in CI on every pull request.
+- API: 196 unit + 178 integration tests (real PostgreSQL/PostGIS and Valkey, never mocks).
+- Website: 40 unit tests, and 16 browser tests (Playwright, desktop and phone) of the MVP path, run in CI on every pull request.
 - Lint and type-check are clean, and CI runs everything on every pull request.
 
 **Browser runs (by hand, against a local API and database):**

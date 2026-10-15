@@ -26,6 +26,24 @@ test('the legal pages open from the footer and say they are drafts', async ({ pa
   }
 });
 
+test('phones get a bottom tab bar, desktops a top search box', async ({ page, isMobile }) => {
+  await page.goto('/');
+  const tabs = page.getByRole('navigation', { name: 'Sections' });
+  const headerSearch = page.getByRole('searchbox', { name: 'Search offers and shops' });
+  if (!isMobile) {
+    await expect(tabs).toBeHidden();
+    await expect(headerSearch).toBeVisible();
+    return;
+  }
+  await expect(headerSearch).toBeHidden();
+  await expect(tabs.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+  await tabs.getByRole('link', { name: 'Search' }).click();
+  await page.waitForURL(/\/search/);
+  await expect(tabs.getByRole('link', { name: 'Search' })).toHaveAttribute('aria-current', 'page');
+  await tabs.getByRole('link', { name: 'Log in' }).click();
+  await page.waitForURL(/\/login/);
+});
+
 test('private pages ask visitors to log in', async ({ page }) => {
   await page.goto('/notifications');
   await expect(page.getByText('Please log in to continue.')).toBeVisible();
