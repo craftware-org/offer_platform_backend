@@ -1,35 +1,199 @@
 @import 'tailwindcss';
 
+/*
+ * Design system (UI phase, PR 1): "bright and friendly". Warm neutrals, Dodoom orange as the
+ * accent, rounded cards, clear type. Dark mode redefines the palette variables once, so every
+ * page that uses gray-*, white, brand-*, red-*, amber-*, green-* … switches without per-page work.
+ * The theme is chosen on <html data-theme="light|dark"> (system default, set before first paint).
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, 'Noto Sans Kannada', sans-serif;
+
   --color-brand-50: #fff7ed;
   --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
   --color-brand-500: #f97316;
   --color-brand-600: #ea580c;
   --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+
+  /* Warm greys instead of the default cool ones. */
+  --color-gray-50: #faf8f6;
+  --color-gray-100: #f3f0ec;
+  --color-gray-200: #e7e2dc;
+  --color-gray-300: #d6cfc7;
+  --color-gray-400: #a8a097;
+  --color-gray-500: #7d756c;
+  --color-gray-600: #5f5850;
+  --color-gray-700: #48423c;
+  --color-gray-800: #2f2a26;
+  --color-gray-900: #1f1b18;
+  --color-gray-950: #120f0d;
+
+  /* Text on brand-coloured surfaces stays white in both themes. */
+  --color-on-brand: #ffffff;
+  --color-page: #faf8f6;
+
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(31 27 24 / 0.04), 0 4px 16px rgb(31 27 24 / 0.06);
+  --shadow-pop: 0 8px 30px rgb(31 27 24 / 0.14);
+
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.28s ease-out both;
+  --animate-pop: pop 0.32s ease-out;
+
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-page: #121010;
+  --color-white: #1c1917;
+  --color-black: #ffffff;
+  --color-gray-50: #161413;
+  --color-gray-100: #24201e;
+  --color-gray-200: #322d2a;
+  --color-gray-300: #443e3a;
+  --color-gray-400: #6f6760;
+  --color-gray-500: #9a928a;
+  --color-gray-600: #b9b1a9;
+  --color-gray-700: #d4cdc6;
+  --color-gray-800: #e8e2dc;
+  --color-gray-900: #f6f2ee;
+  --color-gray-950: #ffffff;
+  --color-slate-200: #334155;
+  --color-slate-800: #e2e8f0;
+
+  --color-brand-50: #2b1a0f;
+  --color-brand-100: #3d2413;
+  --color-brand-200: #5c3317;
+  --color-brand-700: #fb923c;
+  --color-brand-800: #fdba74;
+  --color-brand-900: #fed7aa;
+
+  --color-amber-50: #2b2110;
+  --color-amber-100: #3a2c12;
+  --color-amber-300: #7a5a1c;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+  --color-red-50: #2d1414;
+  --color-red-100: #3d1818;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-green-50: #11251a;
+  --color-green-100: #163222;
+  --color-green-200: #1f4a31;
+  --color-green-700: #86efac;
+  --color-green-800: #bbf7d0;
+  --color-green-900: #dcfce7;
+  --color-emerald-600: #34d399;
+  --color-sky-50: #0f2230;
+  --color-sky-900: #bae6fd;
+  --color-blue-100: #172554;
+  --color-blue-800: #bfdbfe;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 8px 30px rgb(0 0 0 / 0.5);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background-color: var(--color-page);
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 /* Shared building blocks (Tailwind 4: custom classes usable with @apply are declared with @utility). */
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap transition duration-150 select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
+}
+@utility btn-sm {
+  @apply min-h-8 rounded-lg px-3 py-1 text-xs;
+}
+@utility btn-lg {
+  @apply min-h-12 px-6 text-base;
 }
 @utility btn-primary {
-  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  @apply btn bg-brand-600 text-on-brand shadow-sm hover:bg-brand-700 dark:hover:bg-brand-500;
 }
 @utility btn-secondary {
-  @apply btn border border-gray-300 bg-white text-gray-800 hover:bg-gray-50;
+  @apply btn border border-gray-200 bg-white text-gray-800 shadow-sm hover:border-gray-300 hover:bg-gray-50;
+}
+@utility btn-ghost {
+  @apply btn text-gray-700 hover:bg-gray-100;
 }
 @utility btn-danger {
-  @apply btn bg-red-600 text-white hover:bg-red-700;
+  @apply btn bg-red-600 text-on-brand hover:opacity-90 dark:text-gray-50;
+}
+@utility icon-btn {
+  @apply inline-flex size-10 items-center justify-center rounded-full text-gray-700 transition duration-150 hover:bg-gray-100 active:scale-95;
 }
 @utility input {
-  @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-100 focus:outline-none;
+  @apply min-h-10 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition placeholder:text-gray-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100 focus:outline-none;
 }
 @utility label {
-  @apply mb-1 block text-sm font-medium text-gray-700;
+  @apply mb-1.5 block text-sm font-semibold text-gray-700;
 }
 @utility card {
-  @apply rounded-xl border border-gray-200 bg-white p-4 shadow-sm;
+  @apply rounded-2xl border border-gray-200/70 bg-white p-4 shadow-card;
 }
 @utility badge {
-  @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+@utility chip {
+  @apply inline-flex min-h-9 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-gray-700 shadow-sm transition hover:border-brand-300 hover:text-brand-700 active:scale-[0.97];
+}
+@utility chip-active {
+  @apply chip border-brand-600 bg-brand-600 text-on-brand hover:text-on-brand;
+}
+@utility skeleton {
+  @apply animate-shimmer rounded-lg bg-gray-100 bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.5),transparent)] bg-no-repeat dark:bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.06),transparent)];
+  background-size: 400px 100%;
+}
+@utility page-title {
+  @apply text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl;
+}
+@utility section-title {
+  @apply text-lg font-bold tracking-tight text-gray-900;
 }

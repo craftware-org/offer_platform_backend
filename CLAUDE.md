@@ -63,9 +63,10 @@ Other rules:
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
 | Listings | **Platform listings**: chain outlets listed by an admin from the brand's public page, labelled "Listed by", never verified, offers 7 days max (ADR-0019) | ✅ Done 2026-10-14 (PR #21); deployed to the preview 2026-10-15, first 3 shops listed |
+| UI | **Website redesign** in 5 PRs (ADR-0023): (1) design system, dark mode, top bar + phone tab bar ✅; (2) home, search, cards; (3) offer and shop pages; (4) business portal + admin; (5) forms and polish | 🚧 Approved 2026-10-15, PR 1 done |
 | 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, S3 image storage built ✅ (switch-over pending), off-server backups (waiting for the IAM role), then RDS, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 196 unit + 178 integration tests (incl. a real S3-compatible server) (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **14 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 196 unit + 178 integration tests (incl. a real S3-compatible server) (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 40 unit tests; **16 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -343,6 +344,12 @@ Full guide: [docs/deployment.md](docs/deployment.md).
 | Business portal | `/business`, `/business/new`, `/business/[id]`, `/business/[id]/insights`, `/business/[id]/offers/new`, `/business/offers/[offerId]` |
 | Admin | `/admin` (review queues), `/admin/insights`, `/admin/listings`, `/admin/reports[/id]`, `/admin/businesses/[id]`, `/admin/offers/[id]`, `/admin/users[/id]`, `/admin/categories`, `/admin/locations`, `/admin/settings` (Super admin), `/admin/activity` |
 
+**Website look and navigation** (UI redesign, ADR-0023):
+- **Phones:** a bottom tab bar (`components/bottom-nav.tsx`): Home · Search · Saved · Alerts (unread count) · Account (Log in when logged out). The Account page (`components/account-hub.tsx`) leads to following, the business portal, admin and the theme switch.
+- **Desktop:** one top bar (`components/site-header.tsx`): logo, search box, For businesses, Admin, Saved, 🔔 and an account menu (`components/account-menu.tsx`).
+- **Design system** in `app/globals.css`: brand orange, warm grays, Plus Jakarta Sans (self-hosted), shared classes `btn-primary|secondary|ghost|danger`, `btn-sm|lg`, `icon-btn`, `input`, `label`, `card`, `badge`, `chip`, `skeleton`, `page-title`, `section-title`. Icons: `lucide-react`.
+- **Dark mode:** Light / Dark / Device, stored per browser (`op.theme` in localStorage) and applied before the first paint (`lib/theme.ts`, a nonce'd inline script). It works by overriding the Tailwind colour variables under `[data-theme='dark']`.
+
 Images:
 - **Public images** load directly from the API.
 - **Private images** (verification photos, owner and admin views) are fetched with the token and shown as `blob:` URLs.
@@ -407,6 +414,7 @@ Still open:
 **Product work (each needs approval first):**
 - **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Built, not switched on: images on S3 (PR #23, ADR-0020; switch steps in docs/deployment.md "Images on S3", needs the owner's OK for the bucket, role policy and metadata hop limit 2). Next: RDS, MSG91, the domain, switch-over.
 - **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
+- **UI redesign** (approved 2026-10-15, ADR-0023): PR 1 (design system, dark mode, navigation) done. Next: PR 2 home, search and offer cards; PR 3 offer and shop pages; PR 4 business portal and admin layout; PR 5 forms, empty states and polish.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
 **Known gaps / technical debt:**
@@ -459,7 +467,10 @@ Still open:
 - The CSP nonce only works with dynamic rendering, so the root layout calls `connection()`.
 - Tailwind 4: custom classes used with `@apply` must be declared with `@utility`.
 - oxlint: the React `set-state-in-effect` rule is off on purpose (data-loading effects).
-- The header has many links: keep its rows `flex-wrap` and check a 375 px width (it overflowed after Phase 5 until Phase 6 fixed it).
+- Phones navigate with the bottom tab bar; keep the top bar short (logo + 2 icons on phones) and check a 375 px width.
+- Dark mode redefines `--color-white` as the card surface: white text on orange must be `text-on-brand`, never `text-white`.
+- The main content fades in for 0.28 s: a screenshot taken right after navigation can look faded. Wait a moment.
+- `next dev` writes `apps/web/AGENTS.md` and `apps/web/CLAUDE.md` (Next.js 16 notes for AI agents); they are committed so the tree stays clean.
 
 **Windows and tools**
 - Mark shell scripts executable in git with `git update-index --chmod=+x`; Windows loses the bit and the server then refuses to run them.
@@ -498,7 +509,7 @@ Still open:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0020).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0020, 0023).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -707,6 +718,18 @@ Still open:
 
 **Done when:** the MVP success scenario passes on production with a real database, real SMS and email, backups and alarms working, and the owner signs off.
 
+### UI redesign — 🚧 Approved 2026-10-15, PR 1 done
+
+> Owner (2026-10-15): the website looked "1 out of 10". Plan approved with "Bright & friendly" style, a **bottom tab bar** on phones and **dark mode now** (ADR-0023).
+
+| PR | Scope | State |
+|---|---|---|
+| 1 | Design tokens and shared classes, icons, dark mode, top bar + account menu, phone tab bar, Account hub | ✅ Done |
+| 2 | Home (hero, sections, categories), search (filters as chips), offer cards, loading skeletons | Next |
+| 3 | Offer and shop pages: image gallery, sticky actions on phones, clearer price and expiry | |
+| 4 | Business portal and admin: side navigation, dashboards, tables that work on phones | |
+| 5 | Forms (business, offer, login), empty states, error messages, final accessibility pass | |
+
 ### Later (not scheduled)
 
 - **Mobile apps** (`apps/mobile`), using the same API and OpenAPI contract.
@@ -729,6 +752,26 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-15 · PR #25 · UI redesign (part 1): design system, dark mode, new navigation · Claude (AI agent), plan approved by the product owner 2026-10-15
+- **What changed:**
+  - **ADR-0023** (0021 is MSG91 in PR #24, 0022 is kept for the Android app in PR #18).
+  - **Design system** (`app/globals.css`): brand and warm-gray scales, Plus Jakarta Sans via `next/font` (self-hosted), radii, shadows, short animations (`fade-up`, `pop`, `shimmer`), and shared classes for buttons, inputs, cards, badges, chips and skeletons. Visible keyboard focus; motion off for `prefers-reduced-motion`.
+  - **Icons:** `lucide-react` 1.48.0.
+  - **Dark mode:** Light / Dark / Device switch in the account menu and on the Account page; stored in `op.theme`; applied before first paint by a nonce'd inline script; Tailwind colour variables overridden under `[data-theme='dark']`. `text-on-brand` added for white-on-orange.
+  - **Navigation:**
+    - new top bar (`site-header.tsx`): logo, search box (desktop), For businesses, Admin, Saved, 🔔 with count, account menu (`account-menu.tsx`) or Log in;
+    - new **phone bottom tab bar** (`bottom-nav.tsx`): Home · Search · Saved · Alerts · Account, active tab highlighted, unread badge, safe-area padding;
+    - the Account page starts with a hub (`account-hub.tsx`): who you are, links to saved, following, notifications, For businesses, Admin, and Appearance;
+    - new footer.
+  - Removed the old `header.tsx` and `notification-bell.tsx`; the unread count moved to `lib/use-unread-count.ts`.
+- **Why:** owner feedback 2026-10-15 ("the UI is not clean… navigation… 1 out of 10"); first of 5 UI pull requests (§13).
+- **How it was verified:**
+  - web lint, types, build; **40 unit tests** (10 new: which tab lights up for each path);
+  - **16 browser tests** (2 new: phones get the tab bar and it navigates; desktops get the top search box) against a local API, worker and website;
+  - checked by hand in a browser at desktop and 375 px, light and dark: top bar, tab bar, account menu, Account page, theme switch, no sideways scroll.
+- **Deploy / migration / env notes:** website only; no API change, no migration, no new environment variables.
+- **Follow-ups:** UI PRs 2–5 (§13). Pages not yet restyled still use the old layout inside the new frame.
 
 ### 2026-10-15 · PR #23 · Phase 9 (part 5): images on S3, built and tested (not switched on) · Claude (AI agent)
 - **What changed:**

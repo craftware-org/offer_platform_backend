@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { NOTIFICATIONS_CHANGED } from '@/components/notification-bell';
+import { NOTIFICATIONS_CHANGED } from '@/lib/use-unread-count';
 import { RequireAuth } from '@/components/require-auth';
 import { api, apiPage, errorMessage } from '@/lib/api';
 import { formatDateTime } from '@/lib/time';

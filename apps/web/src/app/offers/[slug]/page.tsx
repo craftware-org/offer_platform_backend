@@ -55,7 +55,7 @@ export default async function OfferPage({ params }: Props) {
             {offer.availability === 'PAUSED' ? 'This offer is paused for now.' : 'This offer has ended.'}
           </p>
         )}
-        {offer.headline && <span className="badge bg-brand-600 text-sm text-white">{offer.headline}</span>}
+        {offer.headline && <span className="badge bg-brand-600 text-sm text-on-brand">{offer.headline}</span>}
         <h1 className="text-2xl font-bold">{offer.title}</h1>
         <OfferPrice type={offer.type} pricing={offer.pricing} />
         <div className="flex flex-wrap gap-2">
