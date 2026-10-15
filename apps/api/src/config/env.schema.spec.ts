@@ -43,6 +43,22 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...base, JWT_ACCESS_SECRET: 'short' })).toThrow(/at least 32/);
   });
 
+  it('MSG91 needs its key and template, and keeps the real address in production', () => {
+    expect(() => parseEnv({ ...base, SMS_PROVIDER: 'msg91' })).toThrow(/MSG91_AUTH_KEY is required/);
+    const env = parseEnv({ ...base, SMS_PROVIDER: 'msg91', MSG91_AUTH_KEY: 'k'.repeat(24), MSG91_OTP_TEMPLATE_ID: 't1' });
+    expect(env).toMatchObject({ MSG91_OTP_CODE_VAR: 'var1', MSG91_BASE_URL: 'https://control.msg91.com' });
+    expect(() =>
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        SMS_PROVIDER: 'msg91',
+        MSG91_AUTH_KEY: 'k'.repeat(24),
+        MSG91_OTP_TEMPLATE_ID: 't1',
+        MSG91_BASE_URL: 'http://127.0.0.1:9999',
+      }),
+    ).toThrow(/custom MSG91 address/);
+  });
+
   it('refuses the console SMS provider in production', () => {
     expect(() => parseEnv({ ...base, NODE_ENV: 'production' })).toThrow(/console SMS provider/);
   });

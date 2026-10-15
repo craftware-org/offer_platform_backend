@@ -70,6 +70,17 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 
 **Without the `STAGING_SSH_KEY` secret,** only the two HTTP checks run.
 
+## Phone login codes (MSG91, ADR-0021)
+
+Built and tested; **switched on after the TRAI DLT registration** (phone codes stay in the server log until then):
+
+1. In MSG91: complete the DLT steps (entity, sender ID, and an OTP template such as "##var1## is your Dodoom verification code. It expires in 5 minutes. Do not share it with anyone."), then add the approved template under SMS → Templates and note its **template id** and the **variable name** it uses.
+2. On the server, in `.env`: `MSG91_OTP_TEMPLATE_ID=<id>` and `MSG91_OTP_CODE_VAR=<variable, e.g. var1>`.
+3. Type the key into the hidden prompt: `./set-secret.sh MSG91_AUTH_KEY`. It saves it, sets `SMS_PROVIDER=msg91` and restarts the API and worker.
+4. **Check:** request a phone code on the website for a team phone; it arrives by SMS and no longer appears in `docker compose logs api`. On failure the API log shows "MSG91 refused the SMS … (HTTP …): <reason>".
+
+To go back to the log: `SMS_PROVIDER=console` (preview only) and `docker compose up -d api worker`.
+
 ## 4. Email login codes (Gmail)
 
 1. On the Google account `craftwaretech@gmail.com`: turn on **2-Step Verification**, then create an **App Password**.

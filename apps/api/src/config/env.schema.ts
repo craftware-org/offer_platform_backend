@@ -43,8 +43,15 @@ export const envSchema = z
     OTP_MAX_REQUESTS_PER_IP_PER_HOUR: z.coerce.number().int().min(1).default(20),
     DEFAULT_PHONE_COUNTRY: z.string().length(2).default('IN'),
 
-    /** Only `console` exists until an SMS vendor is chosen (ADR-0006). */
-    SMS_PROVIDER: z.enum(['console']).default('console'),
+    /** `console` (log only: development and preview) or `msg91` (owner decision 2026-10-09). */
+    SMS_PROVIDER: z.enum(['console', 'msg91']).default('console'),
+    /** MSG91: secret key (typed into set-secret.sh on the server), DLT-approved OTP template id,
+     * and the template variable that holds the code (e.g. `var1` for a template with `##var1##`). */
+    MSG91_AUTH_KEY: z.string().min(10).optional(),
+    MSG91_OTP_TEMPLATE_ID: z.string().min(1).optional(),
+    MSG91_OTP_CODE_VAR: z.string().regex(/^[A-Za-z0-9_]+$/).default('var1'),
+    /** Only for tests with a local fake server; refused in production. */
+    MSG91_BASE_URL: z.url().default('https://control.msg91.com'),
 
     /** Email login codes: `smtp` (e.g. Gmail with an App Password) or `console` (log only). */
     EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
@@ -104,6 +111,14 @@ export const envSchema = z
         'EMAIL_PROVIDER',
         'The console email provider prints OTPs to logs; only allowed in development or PREVIEW_MODE',
       );
+    }
+    if (env.SMS_PROVIDER === 'msg91') {
+      for (const key of ['MSG91_AUTH_KEY', 'MSG91_OTP_TEMPLATE_ID'] as const) {
+        if (!env[key]) issue(key, `${key} is required when SMS_PROVIDER=msg91`);
+      }
+    }
+    if (strict && env.MSG91_BASE_URL !== 'https://control.msg91.com') {
+      issue('MSG91_BASE_URL', 'A custom MSG91 address is only for tests and development');
     }
     if (strict && env.STORAGE_PROVIDER === 'local') {
       issue('STORAGE_PROVIDER', 'Local disk storage is only allowed in development or PREVIEW_MODE');
