@@ -90,8 +90,8 @@ This is a **team-only preview**: data may be reset, and search engines are told 
 | Domain | `sslip.io` | Free wildcard DNS: `13-235-201-166.sslip.io` resolves to the Elastic IP. Let's Encrypt certificate by Caddy. |
 | Email login codes | Gmail SMTP, sender `craftwaretech@gmail.com` | App Password stored only in the server `.env` (entered with `set-secret.sh`). |
 | Phone login codes | **Not delivered yet** | No SMS vendor. In preview mode phone codes are written to the API log. |
-| First super admin | `offerplatform0101@gmail.com` | Granted with `grant-role --email`. 2-step login (authenticator app) turned on by the owner 2026-10-15. **It is the only admin**, so offers of the shops it lists can't be approved yet (a second admin must approve). More admins: §6. |
-| Listed shops (ADR-0019) | Domino's Pizza, Vidya Nagar · KFC, Gokul Road (Urban Oasis Mall) · Burger King, Inorbit Mall | Listed 2026-10-15 by the Super admin from the brands' official store locators; map points from OpenStreetMap; our own text-only images (no brand logos or photos). 4 offers **pending review** until 22 Oct 2026 16:00 IST: Domino's 2 pizzas from ₹99 each; KFC 2 pc Hot & Crispy for ₹99 (₹499+), free regular Popcorn (₹399+), buy a Veg/Paneer Zinger get a Veg Zinger free. Burger King: no offer (its site shows none without a delivery address). |
+| First super admin | `offerplatform0101@gmail.com` | Granted with `grant-role --email`. 2-step login (authenticator app) turned on by the owner 2026-10-15. Offers of the shops it lists must be approved by **another** admin (ADR-0019). More admins: §6. |
+| Listed shops (ADR-0019) | Domino's Pizza, Vidya Nagar · KFC, Gokul Road (Urban Oasis Mall) · Burger King, Inorbit Mall | Listed 2026-10-15 by the Super admin from the brands' official store locators; map points from OpenStreetMap; our own text-only images (no brand logos or photos). 4 offers **approved and live** (15 Oct, by a second admin) until 22 Oct 2026 16:00 IST: Domino's 2 pizzas from ₹99 each; KFC 2 pc Hot & Crispy for ₹99 (₹499+), free regular Popcorn (₹399+), buy a Veg/Paneer Zinger get a Veg Zinger free. Burger King: no offer (its site shows none without a delivery address). |
 | Areas (localities) | Starter **test** list | Hubballi: Akshay Park, Deshpande Nagar, Gokul Road, Gopankoppa, Keshwapur, Navanagar, Shirur Park, Unkal, Vidya Nagar. Dharwad: Kalyan Nagar, Malmaddi, Narayanpur, Saptapur, Sattur, Shivagiri, Vidyagiri. Replace with the real list before launch. |
 | Other AWS resource | `quba-tours-prod` EC2 instance | **A different project. Never touch it.** |
 
@@ -401,7 +401,6 @@ Still open:
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
 
 **Listed shops (owner actions):**
-- **A second admin** to approve the 4 listed offers: a teammate logs in once, the owner approves `grant-role --role ADMIN` for that email, the teammate sets up 2-step login and approves them in Admin → Review.
 - **Renew weekly:** listed offers run 7 days at most; re-check the brands' pages before 22 Oct 2026 and list them again.
 - **More brands later:** Pizza Hut's official locator shows no Hubballi outlet (15 Oct); McDonald's and Subway couldn't be confirmed from their official sites. Café Coffee Day, Baskin-Robbins or others can be checked the same way.
 
@@ -740,14 +739,13 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
     - KFC, Gokul Road (Shop G1A, Urban Oasis Mall, 580030; source: KFC online ordering page);
     - Burger King, Inorbit Mall (4th floor, Akshay Park, 580030; source: Burger King store locator).
   - Addresses and phones from each brand's official store locator; coordinates from OpenStreetMap (credited in each description).
-  - **4 offers**, written in our own words from the brands' public pages, submitted for review, valid 15 Oct 17:00 – 22 Oct 2026 16:00 IST (see §3).
+  - **4 offers**, written in our own words from the brands' public pages, submitted for review and **approved by a second admin the same day**; live 15 Oct 17:00 – 22 Oct 2026 16:00 IST (see §3).
   - **Images:** our own text-only cards (offer text and brand name as plain text, "Image by Dodoom, not the brand"), one per shop gallery and one per offer. No brand logos, photos or artwork (ADR-0019).
 - **Why:** owner request to show chain offers (Domino's, Pizza Hut, McDonald's, KFC and similar) in Hubballi.
-- **How it was verified:** the public Domino's page shows the "Listed by Dodoom from the brand's public information" notice, the brand link, Call and Directions, and the image; each offer page shows "pending review" with its photo; the listing endpoint answers on the preview.
+- **How it was verified:** the public Domino's page shows the "Listed by Dodoom from the brand's public information" notice, the brand link, Call and Directions, and the image; each offer page showed "pending review" with its photo, and after approval all 4 appear in public search (checked 15 Oct); the listing endpoint answers on the preview.
 - **Not listed:** Pizza Hut (its official locator shows no Hubballi outlet on 15 Oct), McDonald's and Subway (no official locator could confirm a Hubballi outlet). Burger King has no offer.
 - **Gotcha found:** on the offer form, a "Save as draft" click right after filling the fields sometimes did nothing in automation. The sentence "The offer is saved as a draft" is a hint at the top of the form, not a confirmation; a real save opens `/business/offers/<id>`.
 - **Follow-ups:**
-  - a second admin to approve the 4 offers;
   - renew the offers before 22 Oct;
   - more brands after checking their official locators;
   - the owner still has to add the `STAGING_SSH_KEY` secret and attach the backup IAM role.
