@@ -24,5 +24,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0018](0018-admin-two-step-login-with-authenticator-app.md) | 2-step login for admins with an authenticator app (TOTP) | Accepted |
 | [0019](0019-platform-listings-from-brand-pages.md) | Platform listings: shops listed by an admin from the brand's public page | Accepted |
 | [0020](0020-images-in-a-private-s3-bucket.md) | Images in a private S3 bucket, served by the API | Accepted |
+| [0021](0021-msg91-sms-with-dlt-template.md) | Phone login codes through MSG91 with a DLT-approved template | Accepted |
 
 Template: [`template.md`](template.md)

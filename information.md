@@ -152,7 +152,7 @@ Everything else in the specification (statuses, server-side discount calculation
 | Passwords | **Argon2id** via Node's built-in `crypto.argon2` | m=19 MiB, t=2, p=1 (OWASP) |
 | Tokens | JWT HS256 access (15 min, kept in memory) + opaque refresh tokens (30 days, rotating, reuse detection) | |
 | Email | **nodemailer 10** over Gmail SMTP (preview) | Console provider in development |
-| SMS | Console provider only | **Vendor pending** |
+| SMS | MSG91 (built, ADR-0021); console provider until the DLT registration is done | **Switch-on pending DLT** |
 | Logging | **pino** (nestjs-pino) | Coordinates, phone numbers and auth headers are masked |
 | Security headers | **helmet**; website: nonce-based CSP | |
 | Website | **Next.js 16**, **React 19**, **Tailwind CSS 4** | Server-rendered public pages; logged-in screens in the browser |

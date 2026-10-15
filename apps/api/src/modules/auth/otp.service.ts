@@ -141,6 +141,7 @@ export class OtpService {
       await this.sms.send(
         target.destination,
         `${code} is your ${app} verification code. It expires in ${minutes} minutes. Do not share it with anyone.`,
+        code,
       );
       return;
     }
