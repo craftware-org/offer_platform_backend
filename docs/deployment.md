@@ -70,6 +70,19 @@ This ships the **committed** source (`git archive`: no `.env`, no local files) a
 
 **Without the `STAGING_SSH_KEY` secret,** only the two HTTP checks run.
 
+## Images on S3 (Phase 9, ADR-0020)
+
+Built and tested; **not switched on yet** (the preview still uses the server disk). To switch, with the owner's OK for the AWS changes:
+
+1. **Bucket** in `ap-south-1`: private (block all public access), default encryption, ACLs disabled. Versioning optional.
+2. **Instance role policy:** on the role attached to `Offer-Platform` add `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `arn:aws:s3:::<bucket>/*` and `s3:ListBucket` on `arn:aws:s3:::<bucket>`. No access keys anywhere.
+3. **Metadata hop limit 2** (EC2 → Actions → Instance settings → Modify instance metadata options): the API runs in a container and needs the role. Keep IMDSv2 "Required".
+4. **Copy the existing photos** (keys are identical): `sudo /snap/bin/aws s3 sync /var/lib/docker/volumes/offer-platform-staging_storage/_data s3://<bucket>/`.
+5. In `.env`: `STORAGE_PROVIDER=s3` and `S3_BUCKET=<bucket>`, then `docker compose up -d api worker`.
+6. **Check:** open a shop page and an admin verification photo; upload a new photo; `docker compose logs api` shows no S3 errors. Keep the volume until a backup run has copied the bucket.
+
+To go back: `STORAGE_PROVIDER=local` and restart (photos uploaded meanwhile exist only in S3: sync them back first).
+
 ## 4. Email login codes (Gmail)
 
 1. On the Google account `craftwaretech@gmail.com`: turn on **2-Step Verification**, then create an **App Password**.
@@ -118,6 +131,6 @@ A manual `vercel deploy` is not needed. If you ever run one, run it from the rep
 
 ## Before public launch (Phase 9)
 
-- Move PostgreSQL to RDS (PostGIS, point-in-time recovery), Valkey to ElastiCache, and images and backups to S3.
+- Move PostgreSQL to RDS (PostGIS, point-in-time recovery), Valkey to ElastiCache, and backups to S3; switch images to S3 (built, see "Images on S3").
 - Real SMS vendor (TRAI DLT); `PREVIEW_MODE=false`; monitoring and alerts.
 - Production deployment from CI with manual approval.

@@ -43,6 +43,22 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...base, JWT_ACCESS_SECRET: 'short' })).toThrow(/at least 32/);
   });
 
+  it('S3 storage needs a bucket, defaults to Mumbai, and refuses a test endpoint in production', () => {
+    expect(() => parseEnv({ ...base, STORAGE_PROVIDER: 's3' })).toThrow(/S3_BUCKET is required/);
+    const env = parseEnv({ ...base, STORAGE_PROVIDER: 's3', S3_BUCKET: 'offer-platform-images' });
+    expect(env).toMatchObject({ S3_REGION: 'ap-south-1', S3_FORCE_PATH_STYLE: false });
+    // Every problem is listed in one error, so the endpoint rule shows up next to the others.
+    expect(() =>
+      parseEnv({
+        ...base,
+        NODE_ENV: 'production',
+        STORAGE_PROVIDER: 's3',
+        S3_BUCKET: 'offer-platform-images',
+        S3_ENDPOINT: 'http://localhost:9090',
+      }),
+    ).toThrow(/custom S3 endpoint/);
+  });
+
   it('refuses the console SMS provider in production', () => {
     expect(() => parseEnv({ ...base, NODE_ENV: 'production' })).toThrow(/console SMS provider/);
   });

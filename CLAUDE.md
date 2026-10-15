@@ -63,9 +63,9 @@ Other rules:
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
 | Listings | **Platform listings**: chain outlets listed by an admin from the brand's public page, labelled "Listed by", never verified, offers 7 days max (ADR-0019) | ✅ Done 2026-10-14 (PR #21); deployed to the preview 2026-10-15, first 3 shops listed |
-| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
+| 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, S3 image storage built ✅ (switch-over pending), off-server backups (waiting for the IAM role), then RDS, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
-**Tests (all must stay green):** API 195 unit + 170 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **14 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
+**Tests (all must stay green):** API 196 unit + 178 integration tests (incl. a real S3-compatible server) (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **14 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
 
 **Merged pull requests:**
 - #1 Phase 1
@@ -73,7 +73,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test · #21 platform listings · #22 change log for the first listings
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test · #21 platform listings · #22 change log for the first listings · #23 S3 image storage
 
 ---
 
@@ -405,7 +405,7 @@ Still open:
 - **More brands later:** Pizza Hut's official locator shows no Hubballi outlet (15 Oct); McDonald's and Subway couldn't be confirmed from their official sites. Café Coffee Day, Baskin-Robbins or others can be checked the same way.
 
 **Product work (each needs approval first):**
-- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: RDS + S3 images, MSG91, the domain, switch-over.
+- **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Built, not switched on: images on S3 (PR #23, ADR-0020; switch steps in docs/deployment.md "Images on S3", needs the owner's OK for the bucket, role policy and metadata hop limit 2). Next: RDS, MSG91, the domain, switch-over.
 - **Legal pages need the owner:** registered address, grievance officer (name + email), court city for the terms, the 18+ age rule, then a lawyer's review. The values live in `apps/web/src/lib/legal.ts`; until then the pages show "to be provided" and a "Draft" notice.
 - See the detailed plan in **§13 Roadmap**. (Admin screens and Phases 5–8 are done.)
 
@@ -498,7 +498,7 @@ Still open:
 - [information.md](information.md): **complete project reference**: the idea, the original specification vs final decisions, tech stack, every module, data model, flows, phases, feature checklist, open decisions.
 - [README.md](README.md): quick start.
 - [ARCHITECTURE.md](ARCHITECTURE.md): design, data model, phases.
-- [docs/adr/](docs/adr/README.md): every decision and why (0001–0019).
+- [docs/adr/](docs/adr/README.md): every decision and why (0001–0020).
 - API and auth: [docs/api.md](docs/api.md) (endpoints, error codes) · [docs/authentication.md](docs/authentication.md) · [docs/authorization.md](docs/authorization.md) · [docs/database.md](docs/database.md).
 - Workflows: [docs/business-workflow.md](docs/business-workflow.md) · [docs/offer-workflow.md](docs/offer-workflow.md) · [docs/moderation.md](docs/moderation.md).
 - Operations: [docs/deployment.md](docs/deployment.md).
@@ -693,7 +693,7 @@ Still open:
 
 | Area | Proposed work |
 |---|---|
-| Data | PostgreSQL → **RDS** (PostGIS, point-in-time recovery, automated backups); Valkey → **ElastiCache**; images → **S3** (private photos stay private) |
+| Data | PostgreSQL → **RDS** (PostGIS, point-in-time recovery, automated backups); Valkey → **ElastiCache**; images → **S3**: ✅ storage provider built (PR #23, ADR-0020, private bucket served by the API), switch-over pending |
 | Servers | Bigger instance or a managed container service (choice recorded in an ADR); API and worker scale separately |
 | Releases | API deploys from CI on merge to `main` → staging; production deploy needs a manual approval; migrations run as a separate release step |
 | Domain and email | Real domain: website on Vercel, `api.<domain>` on AWS; email sent from the domain (provider to choose, e.g. SES) with SPF/DKIM/DMARC |
@@ -729,6 +729,17 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-15 · PR #23 · Phase 9 (part 5): images on S3, built and tested (not switched on) · Claude (AI agent)
+- **What changed:**
+  - **ADR-0020:** one **private** S3 bucket; the API keeps serving every image (public ones with the same caching and CORP headers, private ones behind the same permission checks); no access keys, the AWS default credential chain (instance role).
+  - **API:** `S3StorageProvider` behind the existing `StorageProvider` port, chosen with `STORAGE_PROVIDER=s3` + `S3_BUCKET` (`S3_REGION` defaults to `ap-south-1`). `deletePrefix` deletes `prefix/` in pages of 1,000. `@aws-sdk/client-s3` 3.1147.0.
+  - **Config checks:** `S3_BUCKET` required for `s3`; `S3_ENDPOINT` / `S3_FORCE_PATH_STYLE` only for S3-compatible test servers and refused in production.
+  - **Docs:** deployment guide "Images on S3" (bucket, role policy, **metadata hop limit 2** because the API runs in a container, copying existing photos with `aws s3 sync`, switching, going back); `.env.example` files.
+- **Why:** Phase 9 data row; the owner chose S3 for images on 2026-10-09.
+- **How it was verified:** `test/storage-s3.e2e-spec.ts` against a real S3-compatible server (Adobe S3Mock 5.2.3 in Testcontainers): put/get, missing objects, deleting 1,003 objects under a prefix while `img10/` survives, unsafe keys refused (8 tests); 1 new unit test for the config rules. API 196 unit + 178 integration tests, lint and types clean.
+- **Deploy / migration / env notes:** no migration; nothing changes until `STORAGE_PROVIDER=s3` is set. New optional env vars `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`.
+- **Follow-ups:** the owner's OK to create the images bucket and add the role policy, then the switch-over steps; the off-server backups branch still waits for the role to be attached. The hop-limit advice for backups alone (1) changes to 2 once the API uses S3.
 
 ### 2026-10-15 · Operations + PR #22 · First platform listings on the preview · Claude (AI agent), on the owner's request
 - **What changed:**
