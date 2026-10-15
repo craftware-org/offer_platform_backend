@@ -125,7 +125,7 @@ The product owner's original specification ("Craftfiz master specification", 62 
 | Validation | (not specified) | **Zod 4** on every endpoint | One schema validates input and documents it |
 | Login | Phone OTP preferred; email/Google/Apple possible | **Phone or email code**, then **password** (ADR-0006, ADR-0015) | SMS needs a vendor + TRAI DLT (pending). Email works now; passwords reduce friction |
 | Business verification | PAN, GSTIN, registration documents (configurable) | **No identity documents**: shop photo, optional owner photo, optional registration number; configurable by admins (ADR-0012) | Owner's choice: don't hold sensitive documents |
-| Object storage | S3-type storage | **Server disk** in preview; **S3** before launch | Simplicity for the team preview |
+| Object storage | S3-type storage | **Server disk** in preview; **S3** built (private bucket served by the API, ADR-0020), switched on before launch | Simplicity for the team preview |
 | Notifications | Firebase Cloud Messaging | **In-app inbox + email** now (ADR-0016); **push (FCM proposed) later with the mobile apps** | The website works without push; email already worked through Gmail |
 | Maps | Google Maps Platform | **Pending decision**; today businesses enter coordinates or tap "I am at the shop" | Avoid cost and lock-in until needed |
 | Hosting | (not specified) | **AWS Mumbai** for the API (ADR-0011, ADR-0013); **Vercel** for the website (ADR-0014) | Data close to users in India; free and fast for the website |
