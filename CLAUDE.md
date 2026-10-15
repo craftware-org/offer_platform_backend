@@ -2,7 +2,7 @@
 
 This is the single entry point for **teammates and AI assistants** (Claude Code loads this file automatically). It says what the project is, what is done, what is running where, what is left, and the rules for working here. Deeper detail lives in the linked docs.
 
-> **Last updated: 2026-10-14.**
+> **Last updated: 2026-10-15.**
 
 > [!IMPORTANT]
 > **MANDATORY RULE: keep this file current.** Anyone who changes this project (a teammate, Claude, or any other AI agent) **must update this file in the same pull request**. A pull request that changes code, configuration, infrastructure or decisions without updating CLAUDE.md is not finished and must not be merged. Write it for the next person, who has none of your context. Exactly what to update: §0 below.
@@ -62,7 +62,7 @@ Other rules:
 | 6 | **Notifications**: 🔔 in-app inbox + email (Gmail SMTP), per-type preferences, one-click unsubscribe, offer-ending and admin daily summary jobs. Push comes later with the mobile apps | ✅ Done 2026-10-08 |
 | 7 | **Analytics**: views and taps from everyone (anonymous, deduped), search logging, nightly daily totals, business Performance page, admin Insights, weekly business summary | ✅ Done 2026-10-09 |
 | 8 | **Security audit**: authenticator-app 2-step login for admins, every-route permission test, complete account deletion (owned shops closed), retention clean-up, dependency fixes, backup restore drill ([report](docs/security-audit-2026-10-09.md)) | ✅ Done 2026-10-09 |
-| Listings | **Platform listings**: chain outlets listed by an admin from the brand's public page, labelled "Listed by", never verified, offers 7 days max (ADR-0019) | ✅ Done 2026-10-14 (draft PR, owner to review) |
+| Listings | **Platform listings**: chain outlets listed by an admin from the brand's public page, labelled "Listed by", never verified, offers 7 days max (ADR-0019) | ✅ Done 2026-10-14 (PR #21); deployed to the preview 2026-10-15, first 3 shops listed |
 | 9 | Production readiness: CI deploys ✅, monitoring ✅, browser tests ✅, draft legal pages ✅, load test ✅, off-server backups (waiting for the IAM role), then RDS + S3, MSG91 SMS, real domain | 🚧 Approved 2026-10-09, in progress |
 
 **Tests (all must stay green):** API 195 unit + 170 integration tests (real PostgreSQL/PostGIS and Valkey via Testcontainers); web 30 unit tests; **14 browser tests** (Playwright, desktop + phone) run in CI on every pull request. Lint and type-check are clean.
@@ -73,7 +73,7 @@ Other rules:
 - #3 Phase 3
 - #4 Phase 4 + staging
 - #5 Website
-- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test
+- #6 `add-localities` CLI · #7 this handbook · #8 password login · #9 roadmap, update rule, change log · #10 admin screens · #11 information.md · #12 Phase 5 engagement · #13 Phase 6 notifications · #14 Phase 7 analytics · #15 Phase 8 security audit · #16 Phase 9 deploys + monitoring · #17 Phase 9 browser tests · #19 Phase 9 draft legal pages · #20 Phase 9 load test · #21 platform listings · #22 change log for the first listings
 
 ---
 
@@ -90,7 +90,8 @@ This is a **team-only preview**: data may be reset, and search engines are told 
 | Domain | `sslip.io` | Free wildcard DNS: `13-235-201-166.sslip.io` resolves to the Elastic IP. Let's Encrypt certificate by Caddy. |
 | Email login codes | Gmail SMTP, sender `craftwaretech@gmail.com` | App Password stored only in the server `.env` (entered with `set-secret.sh`). |
 | Phone login codes | **Not delivered yet** | No SMS vendor. In preview mode phone codes are written to the API log. |
-| First super admin | `offerplatform0101@gmail.com` | Granted with `grant-role --email`. More admins: §6. |
+| First super admin | `offerplatform0101@gmail.com` | Granted with `grant-role --email`. 2-step login (authenticator app) turned on by the owner 2026-10-15. Offers of the shops it lists must be approved by **another** admin (ADR-0019). More admins: §6. |
+| Listed shops (ADR-0019) | Domino's Pizza, Vidya Nagar · KFC, Gokul Road (Urban Oasis Mall) · Burger King, Inorbit Mall | Listed 2026-10-15 by the Super admin from the brands' official store locators; map points from OpenStreetMap; our own text-only images (no brand logos or photos). 4 offers **approved and live** (15 Oct, by a second admin) until 22 Oct 2026 16:00 IST: Domino's 2 pizzas from ₹99 each; KFC 2 pc Hot & Crispy for ₹99 (₹499+), free regular Popcorn (₹399+), buy a Veg/Paneer Zinger get a Veg Zinger free. Burger King: no offer (its site shows none without a delivery address). |
 | Areas (localities) | Starter **test** list | Hubballi: Akshay Park, Deshpande Nagar, Gokul Road, Gopankoppa, Keshwapur, Navanagar, Shirur Park, Unkal, Vidya Nagar. Dharwad: Kalyan Nagar, Malmaddi, Narayanpur, Saptapur, Sattur, Shivagiri, Vidyagiri. Replace with the real list before launch. |
 | Other AWS resource | `quba-tours-prod` EC2 instance | **A different project. Never touch it.** |
 
@@ -398,6 +399,10 @@ Still open:
    - Vercel: `NEXT_PUBLIC_API_URL`.
 4. **MVP launch date.** Push provider (FCM proposed) when the mobile apps start.
 5. **Real list of areas** for Hubballi-Dharwad (replace the starter test list).
+
+**Listed shops (owner actions):**
+- **Renew weekly:** listed offers run 7 days at most; re-check the brands' pages before 22 Oct 2026 and list them again.
+- **More brands later:** Pizza Hut's official locator shows no Hubballi outlet (15 Oct); McDonald's and Subway couldn't be confirmed from their official sites. Café Coffee Day, Baskin-Robbins or others can be checked the same way.
 
 **Product work (each needs approval first):**
 - **Phase 9 (production readiness)**: approved 2026-10-09 and in progress. Done: automatic API deploys and monitoring, browser tests in CI, draft legal pages (PR #19), load test of search and login with a search speed-up (PR #20, [docs/load-test.md](docs/load-test.md)). In progress: off-server backups to S3 (bucket and role created 2026-10-10; the owner attaches the role to the instance, branch `feat/phase-9-offsite-backups`). Next: RDS + S3 images, MSG91, the domain, switch-over.
@@ -724,6 +729,26 @@ Newest first. **Every pull request adds an entry here** (see §0). Operational c
 - Deploy / migration / env notes:
 - Follow-ups:
 ```
+
+### 2026-10-15 · Operations + PR #22 · First platform listings on the preview · Claude (AI agent), on the owner's request
+- **What changed:**
+  - **Deployed `main` (5bed61f, PR #21) to the preview** by hand: automatic deploys still skip without the `STAGING_SSH_KEY` secret. Migration 0013 ran; Admin → Listed shops works; API and worker healthy.
+  - The owner logged in as `offerplatform0101@gmail.com` and turned on **2-step login** (Claude did not enter any password, login code or authenticator code).
+  - **Listed 3 shops** (Admin → Listed shops), one outlet per brand as the owner chose, Food → Fast Food:
+    - Domino's Pizza, Vidya Nagar (Times Square, Prashant Colony, 580031; source: Domino's Hubli store page);
+    - KFC, Gokul Road (Shop G1A, Urban Oasis Mall, 580030; source: KFC online ordering page);
+    - Burger King, Inorbit Mall (4th floor, Akshay Park, 580030; source: Burger King store locator).
+  - Addresses and phones from each brand's official store locator; coordinates from OpenStreetMap (credited in each description).
+  - **4 offers**, written in our own words from the brands' public pages, submitted for review and **approved by a second admin the same day**; live 15 Oct 17:00 – 22 Oct 2026 16:00 IST (see §3).
+  - **Images:** our own text-only cards (offer text and brand name as plain text, "Image by Dodoom, not the brand"), one per shop gallery and one per offer. No brand logos, photos or artwork (ADR-0019).
+- **Why:** owner request to show chain offers (Domino's, Pizza Hut, McDonald's, KFC and similar) in Hubballi.
+- **How it was verified:** the public Domino's page shows the "Listed by Dodoom from the brand's public information" notice, the brand link, Call and Directions, and the image; each offer page showed "pending review" with its photo, and after approval all 4 appear in public search (checked 15 Oct); the listing endpoint answers on the preview.
+- **Not listed:** Pizza Hut (its official locator shows no Hubballi outlet on 15 Oct), McDonald's and Subway (no official locator could confirm a Hubballi outlet). Burger King has no offer.
+- **Gotcha found:** on the offer form, a "Save as draft" click right after filling the fields sometimes did nothing in automation. The sentence "The offer is saved as a draft" is a hint at the top of the form, not a confirmation; a real save opens `/business/offers/<id>`.
+- **Follow-ups:**
+  - renew the offers before 22 Oct;
+  - more brands after checking their official locators;
+  - the owner still has to add the `STAGING_SSH_KEY` secret and attach the backup IAM role.
 
 ### 2026-10-14 · PR #21 · Platform listings: chain outlets listed from the brand's public page · Claude (AI agent), owner chose "Build it" 2026-10-14
 - **What changed:**
