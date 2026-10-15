@@ -1,3 +1,11 @@
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  NoSuchKey,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Global, Inject, Injectable, Module } from '@nestjs/common';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -60,9 +68,74 @@ export class LocalDiskStorageProvider extends StorageProvider {
   }
 }
 
+/**
+ * Private S3 bucket (Phase 9, ADR-0020). Objects are never public: the API reads them and serves
+ * public images itself, exactly as with local disk, so nothing else changes. Credentials come
+ * from the AWS default chain (the EC2 instance role in production), never from configuration.
+ */
+@Injectable()
+export class S3StorageProvider extends StorageProvider {
+  private readonly bucket: string;
+  readonly client: S3Client;
+
+  constructor(@Inject(APP_CONFIG) config: AppConfig) {
+    super();
+    if (!config.S3_BUCKET) throw new Error('S3_BUCKET is required for S3 storage');
+    this.bucket = config.S3_BUCKET;
+    this.client = new S3Client({
+      region: config.S3_REGION,
+      ...(config.S3_ENDPOINT ? { endpoint: config.S3_ENDPOINT } : {}),
+      forcePathStyle: config.S3_FORCE_PATH_STYLE,
+    });
+  }
+
+  async put(key: string, body: Buffer, contentType: string): Promise<void> {
+    assertSafeKey(key);
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
+    );
+  }
+
+  async get(key: string): Promise<Buffer | null> {
+    assertSafeKey(key);
+    try {
+      const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      return res.Body ? Buffer.from(await res.Body.transformToByteArray()) : null;
+    } catch (error) {
+      if (error instanceof NoSuchKey || (error as { name?: string }).name === 'NoSuchKey') return null;
+      throw error;
+    }
+  }
+
+  /** Deletes every object under `prefix/` (an image's sizes), 1,000 at a time. */
+  async deletePrefix(prefix: string): Promise<void> {
+    assertSafeKey(prefix);
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: `${prefix}/`, ContinuationToken: token }),
+      );
+      const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+      if (keys.length) {
+        await this.client.send(
+          new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: keys, Quiet: true } }),
+        );
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+  }
+}
+
 @Global()
 @Module({
-  providers: [{ provide: StorageProvider, useClass: LocalDiskStorageProvider }],
+  providers: [
+    {
+      provide: StorageProvider,
+      inject: [APP_CONFIG],
+      useFactory: (config: AppConfig): StorageProvider =>
+        config.STORAGE_PROVIDER === 's3' ? new S3StorageProvider(config) : new LocalDiskStorageProvider(config),
+    },
+  ],
   exports: [StorageProvider],
 })
 export class StorageModule {}

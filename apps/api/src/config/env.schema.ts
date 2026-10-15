@@ -72,10 +72,18 @@ export const envSchema = z
 
     RATE_LIMIT_PER_IP_PER_MINUTE: z.coerce.number().int().min(1).default(300),
 
-    /** Only `local` (disk) exists until the S3 adapter is built with the AWS setup (Phase 9). */
-    STORAGE_PROVIDER: z.enum(['local']).default('local'),
+    /** `local` (disk: development and preview) or `s3` (Phase 9, ADR-0020). */
+    STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
     /** Folder for `local` storage, relative to the API's working directory. */
     STORAGE_LOCAL_DIR: z.string().min(1).default('.storage'),
+    /**
+     * `s3` storage: a private bucket. Credentials come from the AWS default chain (on EC2 the
+     * instance role), never from this file. The endpoint is only for S3-compatible test servers.
+     */
+    S3_BUCKET: z.string().min(3).max(63).optional(),
+    S3_REGION: z.string().min(1).default('ap-south-1'),
+    S3_ENDPOINT: z.url().optional(),
+    S3_FORCE_PATH_STYLE: z.stringbool().default(false),
     UPLOADS_PER_USER_PER_HOUR: z.coerce.number().int().min(1).default(60),
 
     /** How often the worker activates scheduled offers and expires ended ones. */
@@ -122,6 +130,12 @@ export const envSchema = z
     }
     if (strict && env.STORAGE_PROVIDER === 'local') {
       issue('STORAGE_PROVIDER', 'Local disk storage is only allowed in development or PREVIEW_MODE');
+    }
+    if (env.STORAGE_PROVIDER === 's3' && !env.S3_BUCKET) {
+      issue('S3_BUCKET', 'S3_BUCKET is required when STORAGE_PROVIDER=s3');
+    }
+    if (strict && env.S3_ENDPOINT) {
+      issue('S3_ENDPOINT', 'A custom S3 endpoint is only for tests and development');
     }
     if (env.EMAIL_PROVIDER === 'smtp') {
       for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'EMAIL_FROM'] as const) {
