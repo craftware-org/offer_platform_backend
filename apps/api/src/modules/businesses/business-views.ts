@@ -56,8 +56,13 @@ export interface PublicBusinessView {
   };
   coordinates: GeoPoint;
   openingHours: OpeningHours | null;
+  /** Verified by an admin as run by its owner. False for platform listings (they are public but unverified). */
   isVerified: boolean;
   verifiedAt: Date | null;
+  /** Listed by the platform team from the brand's public offers page, not by the shop itself. */
+  listedByPlatform: boolean;
+  /** The brand's public page a platform listing comes from; null otherwise. */
+  sourceUrl: string | null;
   logo: ImageView | null;
   gallery: ImageView[];
 }
@@ -137,8 +142,10 @@ export function toPublicView(bundle: BusinessBundle, audience: Audience = 'publi
     },
     coordinates: l.location,
     openingHours: l.openingHours,
-    isVerified: b.status === 'VERIFIED',
-    verifiedAt: b.verifiedAt,
+    isVerified: b.status === 'VERIFIED' && !b.listedByPlatform,
+    verifiedAt: b.listedByPlatform ? null : b.verifiedAt,
+    listedByPlatform: b.listedByPlatform,
+    sourceUrl: b.listedByPlatform ? b.sourceUrl : null,
     logo: logo ? toImageView(audience, logo) : null,
     gallery: ofKind(bundle, 'GALLERY').map((i) => toImageView(audience, i)),
   };

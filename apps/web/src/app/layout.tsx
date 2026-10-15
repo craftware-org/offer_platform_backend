@@ -36,7 +36,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           )}
           <main className="mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
           <footer className="mx-auto flex max-w-6xl flex-wrap gap-x-4 gap-y-1 px-4 py-8 text-xs text-gray-500">
-            <span>© {meta.appName}. Offers are provided by the businesses listed.</span>
+            <span>© {meta.appName}. Offers are provided by the businesses, or listed by us from brands&apos; public pages.</span>
             <nav aria-label="Legal" className="flex flex-wrap gap-x-4 gap-y-1">
               <Link href="/privacy" className="hover:underline">Privacy</Link>
               <Link href="/terms" className="hover:underline">Terms</Link>

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, Patch, Query, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Header, Param, Patch, Post, Query, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import { CurrentPrincipal, RequestId, RequirePermissions } from '../../common/auth/decorators.js';
@@ -6,10 +6,15 @@ import type { Principal } from '../../common/auth/principal.js';
 import { AppError } from '../../common/errors/app-error.js';
 import { pageQuerySchema } from '../../common/http/pagination.js';
 import { Permission } from '../access-control/access-control.catalog.js';
-import { businessStatusActionSchema, updateBusinessSchema } from './business.dto.js';
+import {
+  adminUpdateBusinessSchema,
+  businessStatusActionSchema,
+  createListingSchema,
+} from './business.dto.js';
 import { BusinessImagesService } from './business-images.service.js';
 import { BusinessModerationService } from './business-moderation.service.js';
 import { businessStatus } from './businesses.schema.js';
+import { BusinessesService } from './businesses.service.js';
 
 const idParam = z.uuid();
 const variantParam = z.enum(['full', 'thumb']);
@@ -18,6 +23,7 @@ const listQuery = pageQuerySchema.extend({
   search: z.string().trim().min(1).max(100).optional(),
   cityId: z.uuid().optional(),
   categoryId: z.uuid().optional(),
+  listed: z.stringbool().optional(),
 });
 
 @ApiTags('Admin · Businesses')
@@ -27,7 +33,23 @@ export class BusinessesAdminController {
   constructor(
     private readonly moderation: BusinessModerationService,
     private readonly images: BusinessImagesService,
+    private readonly businesses: BusinessesService,
   ) {}
+
+  @Post('listings')
+  @ApiOperation({
+    summary:
+      'List a shop from the brand\'s public offers page (platform listing): public at once, shown as "Listed by", never verified. The admin becomes its owner.',
+  })
+  @RequirePermissions(Permission.BUSINESSES_MANAGE)
+  async createListing(
+    @Body({ schema: createListingSchema }) body: z.infer<typeof createListingSchema>,
+    @CurrentPrincipal() principal: Principal,
+    @RequestId() requestId?: string,
+  ) {
+    const id = await this.businesses.createListing(body, { userId: principal.userId, requestId });
+    return this.moderation.get(id);
+  }
 
   @Get()
   @ApiOperation({
@@ -73,7 +95,7 @@ export class BusinessesAdminController {
   @RequirePermissions(Permission.BUSINESSES_MANAGE)
   update(
     @Param('id', { schema: idParam }) id: string,
-    @Body({ schema: updateBusinessSchema }) body: z.infer<typeof updateBusinessSchema>,
+    @Body({ schema: adminUpdateBusinessSchema }) body: z.infer<typeof adminUpdateBusinessSchema>,
     @CurrentPrincipal() principal: Principal,
     @RequestId() requestId?: string,
   ) {

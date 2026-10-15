@@ -12,6 +12,7 @@ const SECTIONS: { href: string; label: string; permission: string }[] = [
   { href: '/admin', label: 'Review', permission: 'businesses:read' },
   { href: '/admin/insights', label: 'Insights', permission: 'analytics:read' },
   { href: '/admin/reports', label: 'Reports', permission: 'reports:moderate' },
+  { href: '/admin/listings', label: 'Listed shops', permission: 'businesses:manage' },
   { href: '/admin/users', label: 'Users', permission: 'users:read' },
   { href: '/admin/categories', label: 'Categories', permission: 'categories:manage' },
   { href: '/admin/locations', label: 'Cities & areas', permission: 'locations:manage' },

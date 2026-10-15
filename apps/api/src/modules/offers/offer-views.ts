@@ -45,6 +45,9 @@ export interface PublicOfferView {
     slug: string;
     name: string;
     isVerified: boolean;
+    /** Listed by the platform team from the brand's public offers page (see the business view). */
+    listedByPlatform: boolean;
+    sourceUrl: string | null;
     phone: string;
     whatsapp: string | null;
     website: string | null;
@@ -137,7 +140,9 @@ function baseView(bundle: OfferBundle, audience: OfferAudience, now: Date) {
       id: b.business.id,
       slug: b.business.slug,
       name: b.business.name,
-      isVerified: b.business.status === 'VERIFIED',
+      isVerified: b.business.status === 'VERIFIED' && !b.business.listedByPlatform,
+      listedByPlatform: b.business.listedByPlatform,
+      sourceUrl: b.business.listedByPlatform ? b.business.sourceUrl : null,
       phone: b.business.phone,
       whatsapp: b.business.whatsapp,
       website: b.business.website,

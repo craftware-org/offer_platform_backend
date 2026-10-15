@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { latitude, longitude } from '../locations/locations.dto.js';
 
 /** http(s) links to a real domain only: rejects javascript:, data:, localhost, IPs without a domain, etc. */
-const webUrl = z.url({ protocol: /^https?$/, hostname: z.regexes.domain }).max(300);
+export const webUrl = z.url({ protocol: /^https?$/, hostname: z.regexes.domain }).max(300);
 const phone = z.string().trim().min(5).max(20);
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM');
 
@@ -82,11 +82,25 @@ export const createBusinessSchema = z.strictObject({
 });
 export type CreateBusinessInput = z.infer<typeof createBusinessSchema>;
 
+/**
+ * A platform listing (owner decision 2026-10-14): an admin lists a shop from the brand's public
+ * offers page. `sourceUrl` is that page; customers see it as "Listed by <app name>".
+ */
+export const createListingSchema = createBusinessSchema.extend({ sourceUrl: webUrl });
+export type CreateListingInput = z.infer<typeof createListingSchema>;
+
 export const updateBusinessSchema = z
   .strictObject(businessFields)
   .partial()
   .refine((v) => Object.keys(v).length > 0, { message: 'Provide at least one field to update' });
 export type UpdateBusinessInput = z.infer<typeof updateBusinessSchema>;
+
+/** Admins may also change a platform listing's source page. */
+export const adminUpdateBusinessSchema = z
+  .strictObject({ ...businessFields, sourceUrl: webUrl })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, { message: 'Provide at least one field to update' });
+export type AdminUpdateBusinessInput = z.infer<typeof adminUpdateBusinessSchema>;
 
 export const businessStatusActionSchema = z
   .strictObject({

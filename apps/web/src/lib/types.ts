@@ -147,6 +147,9 @@ export interface PublicOffer {
     slug: string;
     name: string;
     isVerified: boolean;
+    /** Listed by the platform team from the brand's public page, not by the shop. */
+    listedByPlatform: boolean;
+    sourceUrl: string | null;
     phone: string;
     whatsapp: string | null;
     website: string | null;
@@ -237,6 +240,9 @@ export interface PublicBusiness {
   openingHours: OpeningHours | null;
   isVerified: boolean;
   verifiedAt: string | null;
+  /** Listed by the platform team from the brand's public page, not by the shop. */
+  listedByPlatform: boolean;
+  sourceUrl: string | null;
   logo: BusinessImage | null;
   gallery: BusinessImage[];
 }

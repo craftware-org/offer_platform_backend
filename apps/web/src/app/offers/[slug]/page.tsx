@@ -5,9 +5,10 @@ import { ContactLinks, SaveButton, ShareButton } from '@/components/engagement-b
 import { OfferPrice } from '@/components/offer-price';
 import { ReportOffer } from '@/components/report-offer';
 import { apiUrl } from '@/lib/config';
-import { serverGet } from '@/lib/server-api';
+import { getAppMeta, serverGet } from '@/lib/server-api';
 import { endsIn, formatDateTime } from '@/lib/time';
 import type { PublicOffer } from '@/lib/types';
+import { ListedNotice } from '@/components/listed-notice';
 import { TrackView } from '@/components/track-view';
 
 type Props = { params: Promise<{ slug: string }> };
@@ -101,6 +102,7 @@ export default async function OfferPage({ params }: Props) {
             {b.address.line1}
             {b.address.locality && `, ${b.address.locality}`}, {b.address.city}
           </p>
+          {b.listedByPlatform && <ListedNotice appName={(await getAppMeta()).appName} sourceUrl={b.sourceUrl} />}
           <ContactLinks
             contact={{
               phone: b.phone,
